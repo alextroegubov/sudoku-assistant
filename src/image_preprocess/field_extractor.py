@@ -2,19 +2,6 @@
 
 import numpy as np
 import cv2 as cv
-import matplotlib.pyplot as plt
-
-
-def viz(img, title=""):
-    plt.figure()
-
-    if len(img.shape) == 3:
-        plt.imshow(img[:, :, ::-1])
-    else:
-        plt.imshow(img, cmap="gray")
-
-    plt.title(title)
-    plt.show()
 
 
 class FieldExtractor:
@@ -177,20 +164,3 @@ class FieldExtractor:
         self.image = image.copy()
         self.get_sudoku_field()
         return self.image
-
-
-if __name__ == "__main__":
-    files = [
-        "/home/user/Documents/data/sudoku-assistant/data/sudoku_1.jpeg",
-        "/home/user/Documents/data/sudoku-assistant/data/sudoku_2.jpeg",
-        "/home/user/Documents/data/sudoku-assistant/data/sudoku_3.jpeg",
-    ]
-
-    ext = FieldExtractor()
-
-    for file in files:
-        img = cv.imread(file)
-        viz(img, "original")
-        ext_imt = ext(img)
-
-        viz(ext_imt, "processed")
