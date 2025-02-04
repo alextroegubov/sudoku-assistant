@@ -7,7 +7,7 @@ import cv2 as cv
 class DigitsSplitter:
 
     MARGIN = 0.05
-    MIN_CNTR_AREA = 0.1
+    MIN_CNTR_AREA = 10
 
     def __init__(self):
         self.image = np.zeros((10, 10))
@@ -40,9 +40,9 @@ class DigitsSplitter:
                 cntrs_area = np.array([cv.contourArea(cntr) for cntr in cntrs])
 
                 if (
-                    not len(cntrs)
+                    len(cntrs) == 0
                     or len(cntrs) > 4
-                    or cntrs_area.max() < roi_area * self.MIN_CNTR_AREA
+                    or cntrs_area.max() < self.MIN_CNTR_AREA
                 ):
                     lst_digits.append(None)
                 else:
