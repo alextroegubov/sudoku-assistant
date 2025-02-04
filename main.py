@@ -1,7 +1,7 @@
 import cv2 as cv
 
 from src.image_preprocess import field_extractor, digits_splitter
-
+from src.classifier import digits_classifier
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -70,22 +70,45 @@ sudoku_example = np.array(
 
 if __name__ == "__main__":
     files = [
-        "/home/user/Documents/data/sudoku-assistant/data/sudoku_1.jpeg",
-        "/home/user/Documents/data/sudoku-assistant/data/sudoku_2.jpeg",
-        "/home/user/Documents/data/sudoku-assistant/data/sudoku_3.jpeg",
+        "data/sudoku_3.jpeg",
+        # "data/sudoku_2.jpeg",
+        # "data/sudoku_3.jpeg",
     ]
 
     ext = field_extractor.FieldExtractor()
     splitter = digits_splitter.DigitsSplitter()
+    classifier = digits_classifier.DigitsClassifier(
+        model_name="mobilenetv2_100.ra_in1k",
+        weights_file="model/best_model.pt",
+        device='cuda',
+    )
 
     for file in files:
         img = cv.imread(file)
         viz(img, "original")
         ext_imt = ext(img)
 
-        digits = splitter(ext_imt)
-        print(len(digits))
-
         viz(ext_imt, "processed")
 
-        plot_sudoku_grid(sudoku_example)
+        digits = splitter(ext_imt)
+
+        not_none_digits = [d for d in digits if d is not None]
+
+        print(len(not_none_digits))
+
+        # for d in not_none_digits:
+        #     viz(d)
+
+        confs, labels = classifier(not_none_digits)
+
+        label_index = 0
+        sudoku_array = []
+        for digit in digits:
+            if digit is None:
+                sudoku_array.append(0)
+            else:
+                sudoku_array.append(labels[label_index] + 1)
+                label_index += 1
+
+        # plot_sudoku_grid(sudoku_example)
+        plot_sudoku_grid(np.array(sudoku_array).reshape(9, 9))
