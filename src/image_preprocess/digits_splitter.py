@@ -50,8 +50,12 @@ class DigitsSplitter:
 
         return lst_digits
 
-    def __call__(self, image: np.ndarray):
+    def __call__(self, image: np.ndarray, with_not_nones: bool = False):
         self.image = image
 
-        lst_digits = self.split_into_digits()
-        return lst_digits
+        all_digits = self.split_into_digits()
+        if with_not_nones:
+            not_none_digits = [d for d in all_digits if d is not None]
+            return all_digits, not_none_digits
+        else:
+            return all_digits
