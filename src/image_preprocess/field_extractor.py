@@ -3,6 +3,7 @@
 import numpy as np
 import cv2 as cv
 
+from src.exceptions import NoContoursError, NoRectContour
 
 class FieldExtractor:
     """Class for extracting field from the image"""
@@ -16,10 +17,11 @@ class FieldExtractor:
         self.image = np.zeros((10, 10), dtype=np.uint8)
 
     def dist(self, pt1, pt2):
+        """L2 distance"""
         return np.sqrt(np.sum(pt1 - pt2) ** 2)
 
     def remove_grid(self):
-
+        """Remove grid using Hough Lines detection algorightm"""
         height, width = self.image.shape
         # draw white border to make outer square consistent
         cv.rectangle(self.image, pt1=(0, 0), pt2=(width, height), color=255, thickness=5)
@@ -100,7 +102,7 @@ class FieldExtractor:
 
         sorted_cntrs = sorted(cntrs, key=cv.contourArea, reverse=True)
         if not sorted_cntrs:
-            raise ValueError("No contours found in the image")
+            raise NoContoursError()
 
         for cntr in sorted_cntrs:
             epsilon = self.FIELD_ARC_EPSILON * cv.arcLength(cntr, closed=True)
@@ -109,7 +111,7 @@ class FieldExtractor:
             if len(corner_points) == 4:
                 return corner_points
 
-        raise ValueError("No 4-point contours")
+        raise NoRectContour()
 
     def remove_perspective(self, corners: np.ndarray):
         """Remove perspective with homography matrix"""
