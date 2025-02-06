@@ -108,32 +108,26 @@ class Sudoku:
         missed_digits = self.all_digits - set(inserted_digits)
         return missed_digits
 
-    def get_empty_indexes_in_block(self, n: int, block_type: BlockType) -> tuple[int]:
+    def get_empty_indexes_in_block(self, n: int, block_type: BlockType) -> tuple[int, ...]:
         """Get empty cell indexes in block"""
         if block_type is Sudoku.BlockType.ROW:
             rows = [n] * 9
             cols = list(range(9))
-            # indexes = tuple(self.row_col_to_idx(row=n, col=col) for col in range(9))
 
         elif block_type is Sudoku.BlockType.COL:
             rows = list(range(9))
             cols = [n] * 9
-            # indexes = tuple(self.row_col_to_idx(row=row, col=n) for row in range(9))
 
         else:
             row, col = Sudoku.square_to_row_col(n)
             rows = [row, row + 1, row + 2] * 3
             cols = [col] * 3 + [col + 1] * 3 + [col + 2] * 3
-            # indexes = tuple(
-            #     self.row_col_to_idx(row=r, col=c)
-            #     for r in range(row, row + 3)
-            #     for c in range(col, col + 3)
-            # )
 
-        indexes = tuple(self.row_col_to_idx(row, col) for (row, col) in zip(rows, cols) if self.data[row, col] == 0)
-
-        # rows_cols = (self.idx_to_row_col(idx) for idx in indexes)
-        # indexes = tuple(idx for idx in indexes if self.data[idx] == 0)
+        indexes = tuple(
+            self.row_col_to_idx(row, col)
+            for (row, col) in zip(rows, cols)
+            if self.data[row, col] == 0
+        )
         return indexes
 
     def block_is_valid(self, n: int, block_type: BlockType) -> bool:
@@ -172,6 +166,7 @@ class Sudoku:
         """Fill possible values based on simple checking of rows, cols and squares.
         Applied per cell.
         """
+        logger.debug("Start Rule #1")
         for idx in range(81):
             row, col = Sudoku.idx_to_row_col(idx)
             if self.data[row, col] == 0:
@@ -181,11 +176,16 @@ class Sudoku:
                     for digit in self.possible[idx]
                     if self.is_digit_possible_in_cell(idx, digit)
                 }
-
-                self.possible[idx] = new_possible
+                if new_possible == self.possible[idx]:
+                    logger.debug("Rule #1: (%s, %s) - no update", row, col)
+                else:
+                    self.possible[idx] = new_possible
+                    logger.debug("Rule #1: (%s, %s) - update: new candidates %s", row, col, new_possible)
 
     def apply_rule_2(self):
         """Remove possible values based on rule #2. Applied per block."""
+        
+        logger.debug("Start Rule #2")
         for block_num in range(9):
             for block_type in Sudoku.BlockType:
                 self.apply_rule_2_one_block(block_num, block_type)
@@ -195,8 +195,11 @@ class Sudoku:
         missed_digits = self.get_missed_digits_in_block(block_num, block_type)
         missed_indexes = self.get_empty_indexes_in_block(block_num, block_type)
 
-        for group_size in [2, 3, 4]:
+        logger.debug("\tRule #2: block %s, type %s. missed = %s, missed_idx = %s", block_num, block_type, missed_digits, missed_indexes)
+
+        for group_size in [1, 2, 3, 4]:
             for group in combinations(missed_digits, group_size):
+
                 group_set = set(group)
 
                 cells_with_digits_from_group = [
@@ -204,10 +207,16 @@ class Sudoku:
                 ]
 
                 if len(cells_with_digits_from_group) == group_size:
+                    logger.debug("\t\tfound group %s, n_cells = %s [%s]", group, len(cells_with_digits_from_group), cells_with_digits_from_group)
+
                     # remove these digits from other cells:
                     for idx in missed_indexes:
                         if idx not in cells_with_digits_from_group:
+                            logger.debug("\t\t update %s idx: old = %s, new = %s", idx, self.possible[idx], self.possible[idx] - group_set)
                             self.possible[idx] = self.possible[idx] - group_set
+                        else:
+                            logger.debug("\t\t update %s idx: old = %s, new = %s", idx, self.possible[idx], self.possible[idx].intersection(group_set))
+                            self.possible[idx] = self.possible[idx].intersection(group_set)
 
     def apply_rule_3_one_block(self, block_num: int, bt: BlockType):
         missed_digits = self.get_missed_digits_in_block(block_num, bt)
@@ -217,11 +226,9 @@ class Sudoku:
             indexes = [idx for idx in missed_indexes if digit in self.possible[idx]]
 
             if len(indexes) == 2 or len(indexes) == 3:
-                rows = [self.idx_to_row_col(idx)[0] for idx in indexes]
-                cols = [self.idx_to_row_col(idx)[1] for idx in indexes]
-                sqs = [self.row_col_to_square(row, col) for row, col in zip(rows, cols)]
-
-                print((sqs == sqs[0]))
+                rows = np.array([self.idx_to_row_col(idx)[0] for idx in indexes])
+                cols = np.array([self.idx_to_row_col(idx)[1] for idx in indexes])
+                sqs = np.array([self.row_col_to_square(row, col) for row, col in zip(rows, cols)])
 
                 indexes_where_to_remove = []
                 if bt is Sudoku.BlockType.SQ and all(rows == rows[0]):
@@ -247,11 +254,13 @@ class Sudoku:
 
     def apply_rule_3(self):
         """Remove possible values based on rule #3 (applied per block)"""
+
+        logger.debug("Start Rule #3")
         for block_num in range(9):
             for block_type in Sudoku.BlockType:
                 self.apply_rule_3_one_block(block_num, block_type)
 
-    def insert_digit(self, idx, digit):
+    def insert_digit(self, idx: int, digit: int):
         row, col = Sudoku.idx_to_row_col(idx)
         self.data[row, col] = digit
         self.possible[idx].clear()
@@ -269,29 +278,30 @@ class Sudoku:
     def solve(self):
         it = 0
         while not self.sudoku_is_solved():
-            print(f"it = {it}")
+            logger.info("Iteration: %s", it)
+
+            logger.debug("\n%s\n", str(self))
 
             count = 1
             # insert as many digits with rule 1 as we can
-            print("Moved to rule 1")
             while count > 0:
                 self.apply_rule_1()
                 count = self.insert_possible_digits()
-                print(f"Inserted {count} digits with rule 1")
+                logger.info("Inserted %d digits with Rule #1", count)
 
-            print("Moved to rule 2")
             self.apply_rule_2()
             count = self.insert_possible_digits()
+            logger.info("Inserted %d digits with Rule #2", count)
+
             if count > 0:
-                print(f"Inserted {count} digits with rule 2")
                 it += 1
                 continue
 
-            print("Moved to rule 3")
             self.apply_rule_3()
             count = self.insert_possible_digits()
+            logger.info("Inserted %d digits with Rule #3", count)
             if count > 0:
-                print(f"Inserted {count} digits with rule 3")
+                logger.debug("insert with rule #3\n%s\n", str(self))
                 it += 1
                 continue
 
@@ -318,11 +328,9 @@ class Sudoku:
             print("\n")
 
 
-sudoku = Sudoku()
+# sudoku = Sudoku()
 
-sudoku.Read("input-middle.txt")
-print(str(sudoku))
-sudoku.solve()
-print(str(sudoku))
+# sudoku.Read("input-master.txt")
 
+# sudoku.solve()
 
