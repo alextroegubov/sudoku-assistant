@@ -4,6 +4,14 @@ import logging
 
 import numpy as np
 
+from src.exceptions import (
+    SudokuError,
+    InvalidInputError,
+    InvalidDigitsError,
+    InvalidFieldError,
+    SolverError,
+)
+
 logger = logging.getLogger(__name__)
 logging.basicConfig(filename="sudoku.log", filemode="w", level=logging.DEBUG, encoding="utf-8")
 
@@ -125,13 +133,19 @@ class Sudoku:
         """Check if the n-th block is valid: all non-zero digits are unique"""
         digits = self._get_digits_in_block(n, block_type).flatten()
         non_zero_count = np.count_nonzero(digits)
-        unique_non_zero_count = len(np.unique(digits[digits > 0]))
+        unique_non_zero = np.unique(digits[digits > 0])
 
-        return non_zero_count == unique_non_zero_count
+        if not set(unique_non_zero).issubset(self.all_digits):
+            raise InvalidDigitsError(
+                f"{block_type} #{n}: invalid digits: {set(unique_non_zero) - self.all_digits}"
+            )
 
-    def sudoku_is_valid(self) -> bool:
+        if non_zero_count != len(unique_non_zero):
+            raise InvalidFieldError(f"{block_type} #{n}: invalid block")
+
+    def sudoku_is_valid(self):
         """Check if sudoku is valid: all block are valid"""
-        return all(self.block_is_valid(n, type_) for n in range(9) for type_ in Sudoku.BlockType)
+        _ = [self.block_is_valid(n, type_) for n in range(9) for type_ in Sudoku.BlockType]
 
     def block_is_solved(self, n: int, block_type: BlockType) -> bool:
         """Check if n-th sudoku block is solved"""
@@ -357,11 +371,16 @@ class Sudoku:
         shape = np_array.shape
 
         if shape == (9, 9):
-            self.data = np_array.copy()
+            self.data = np_array.copy().astype(np.int32)
         elif shape == (81,):
-            self.data = np_array.reshape(9, 9)
+            self.data = np_array.reshape(9, 9).astype(np.int32)
         else:
-            raise ValueError(f"Unsupported numpy array shape: {np_array.shape}")
+            raise InvalidInputError(f"Invalid numpy array shape: {np_array.shape}")
+
+        try:
+            self.sudoku_is_valid()
+        except (InvalidDigitsError, InvalidFieldError) as e:
+            raise InvalidInputError(e.message)
 
 
 solver = Sudoku()

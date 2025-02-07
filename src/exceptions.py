@@ -18,3 +18,41 @@ class NoRectContour(ImagePreprocessingError):
     def __init__(self, message="Failed to detect a rectangular Sudoku grid in the image."):
         self.message = message
         super().__init__(self.message)
+
+
+class SudokuError(Exception):
+    """Base class for exception during sudoku solving"""
+
+    pass
+
+
+class InvalidInputError(SudokuError):
+    """"""
+
+    def __init__(self, message="Invalid shape of numpy array"):
+        self.message = message
+        super().__init__(self.message)
+
+
+class InvalidDigitsError(SudokuError):
+    """"""
+
+    def __init__(self, message="Invalid digits in sudoku field!"):
+        self.message = message
+        super().__init__(self.message)
+
+
+class InvalidFieldError(SudokuError):
+    """"""
+
+    def __init__(self, message="Invalid sudoku grid!"):
+        self.message = message
+        super().__init__(self.message)
+
+
+class SolverError(SudokuError):
+    """"""
+
+    def __init__(self, message="Cannot solve puzzle"):
+        self.message = message
+        super().__init__(self.message)
