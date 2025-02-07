@@ -5,7 +5,6 @@ import logging
 import numpy as np
 
 from src.exceptions import (
-    SudokuError,
     InvalidInputError,
     InvalidDigitsError,
     InvalidFieldError,
@@ -129,23 +128,27 @@ class Sudoku:
         )
         return indexes
 
-    def block_is_valid(self, n: int, block_type: BlockType) -> bool:
+    def block_is_valid(self, n: int, block_type: BlockType):
         """Check if the n-th block is valid: all non-zero digits are unique"""
         digits = self._get_digits_in_block(n, block_type).flatten()
         non_zero_count = np.count_nonzero(digits)
         unique_non_zero = np.unique(digits[digits > 0])
 
         if not set(unique_non_zero).issubset(self.all_digits):
+            logger.warning("Invalid sudoku\n%s", str(self))
             raise InvalidDigitsError(
                 f"{block_type} #{n}: invalid digits: {set(unique_non_zero) - self.all_digits}"
             )
 
         if non_zero_count != len(unique_non_zero):
+            logger.warning("Invalid sudoku\n%s", str(self))
             raise InvalidFieldError(f"{block_type} #{n}: invalid block")
 
     def sudoku_is_valid(self):
         """Check if sudoku is valid: all block are valid"""
-        _ = [self.block_is_valid(n, type_) for n in range(9) for type_ in Sudoku.BlockType]
+        for n in range(9):
+            for type_ in Sudoku.BlockType:
+                self.block_is_valid(n, type_)
 
     def block_is_solved(self, n: int, block_type: BlockType) -> bool:
         """Check if n-th sudoku block is solved"""
@@ -154,6 +157,7 @@ class Sudoku:
 
     def sudoku_is_solved(self) -> bool:
         """Check if sudoku is solved: all blocks are solved"""
+        self.sudoku_is_valid()
         return all(self.block_is_solved(n, type_) for n in range(9) for type_ in Sudoku.BlockType)
 
     def is_digit_possible_in_cell(self, cell_idx: int, digit: int) -> bool:
@@ -195,7 +199,6 @@ class Sudoku:
          3. If number of empty cells, where these digits are possible, equals group size,
             remove all other candidates from these cells
         """
-
         logger.debug("Start Rule #2")
         for block_num in range(9):
             for block_type in Sudoku.BlockType:
@@ -257,7 +260,6 @@ class Sudoku:
                     indexes_where_to_remove = [
                         self.row_col_to_idx(row, fixed_col) for row in range(9) if row not in rows
                     ]
-
                 elif (bt in [Sudoku.BlockType.ROW, Sudoku.BlockType.COL]) and all(sqs == sqs[0]):
                     fixed_sq = sqs[0]
                     empty = self.get_empty_indexes_in_block(fixed_sq, Sudoku.BlockType.SQ)
@@ -354,7 +356,7 @@ class Sudoku:
             logger.info("Sudoku solved in %s iterations", it)
         else:
             logger.info("Exceed iteration limit")
-            raise ValueError
+            raise SolverError()
 
     def read_from_txt(self, input_file: str):
         """Read sudoku from txt"""
@@ -366,6 +368,11 @@ class Sudoku:
                 for col in range(9):
                     if self.data[row, col]:
                         self.possible[self.row_col_to_idx(row, col)].clear()
+
+        try:
+            self.sudoku_is_valid()
+        except (InvalidDigitsError, InvalidFieldError) as e:
+            raise InvalidInputError(e.message) from e
 
     def read_sudoku_from_numpy(self, np_array: np.ndarray):
         shape = np_array.shape
@@ -380,11 +387,4 @@ class Sudoku:
         try:
             self.sudoku_is_valid()
         except (InvalidDigitsError, InvalidFieldError) as e:
-            raise InvalidInputError(e.message)
-
-
-solver = Sudoku()
-
-solver.read_from_txt("/home/user/Documents/data/sudoku-assistant/data/sudoku-middle.txt")
-
-solver.solve()
+            raise InvalidInputError(e.message) from e
