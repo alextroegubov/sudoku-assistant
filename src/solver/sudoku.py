@@ -1,21 +1,8 @@
 from enum import Enum
-from copy import copy
 from itertools import combinations
 import logging
 
 import numpy as np
-
-# class MemoryStamp:
-#     data: np.ndarray
-#     possible: "dict[int, set[int]]"
-#     idx: int
-#     digit: int
-
-#     def __init__(self, data: np.ndarray, possible: "dict[int, set[int]]", idx: int, digit: int):
-#         self.data = np.copy(data)
-#         self.possible = deepcopy(possible)
-#         self.idx = idx
-#         self.digit = digit
 
 logger = logging.getLogger(__name__)
 logging.basicConfig(filename="sudoku.log", filemode="w", level=logging.DEBUG, encoding="utf-8")
@@ -62,11 +49,8 @@ class Sudoku:
         return Sudoku.row_col_to_square(row, col)
 
     def __init__(self):
-        self.data: np.ndarray = np.zeros((9, 9), dtype=int)
-        self.possible = {i: copy(self.all_digits) for i in range(81)}
-
-        logger.info("Sudoku\n %s", str(self))
-        # self.sudoku_stamps = []
+        self.data: np.ndarray = np.zeros((9, 9), dtype=np.int32)
+        self.possible: dict[int, set[int]] = {i: self.all_digits.copy() for i in range(81)}
 
     def __str__(self):
         """String representation of the Sudoku grid."""
@@ -74,16 +58,23 @@ class Sudoku:
 
         # Build the Sudoku grid
         for i, row in enumerate(self.data):
-            line = " ".join(str(num) if num != 0 else "." for num in row)
-            lines.append(line)
-            if i % 3 == 2 and i != 8:  # Add horizontal separator every 3 rows (except last)
+            line = []
+            for j, num in enumerate(row):
+                cell = str(num) if num else "."
+                line.append(cell)
+                if j % 3 == 2 and j != 8:
+                    line.append("|")
+            lines.append(" ".join(line))
+
+            if i % 3 == 2 and i != 8:
                 lines.append("-" * 21)
 
         # Show possible candidates for empty cells
         possible_str = "\nPossible Candidates:\n"
         for idx, candidates in sorted(self.possible.items()):
-            row, col = self.idx_to_row_col(idx)
-            possible_str += f"({row}, {col}): {sorted(candidates)}\n"
+            if len(candidates) > 0:
+                row, col = self.idx_to_row_col(idx)
+                possible_str += f"({row}, {col}): {sorted(candidates)}\n"
 
         return "\n".join(lines) + ("\n" + possible_str if self.possible else "")
 
@@ -163,10 +154,11 @@ class Sudoku:
         return not (in_row or in_col or in_square)
 
     def apply_rule_1(self):
-        """Fill possible values based on simple checking of rows, cols and squares.
+        """Fill possible values based on simple checking of digits in rows, cols and squares.
         Applied per cell.
         """
         logger.debug("Start Rule #1")
+
         for idx in range(81):
             row, col = Sudoku.idx_to_row_col(idx)
             if self.data[row, col] == 0:
@@ -176,15 +168,20 @@ class Sudoku:
                     for digit in self.possible[idx]
                     if self.is_digit_possible_in_cell(idx, digit)
                 }
-                if new_possible == self.possible[idx]:
-                    logger.debug("Rule #1: (%s, %s) - no update", row, col)
-                else:
+                if new_possible != self.possible[idx]:
                     self.possible[idx] = new_possible
-                    logger.debug("Rule #1: (%s, %s) - update: new candidates %s", row, col, new_possible)
+                    logger.debug("\tUpdate (%s, %s): new candidates %s", row, col, new_possible)
 
     def apply_rule_2(self):
-        """Remove possible values based on rule #2. Applied per block."""
-        
+        """Remove possible values based on rule #2. Applied per block.
+
+        Details:
+         1. Find all missing digits in the block
+         2. For group size = 1, 2, 3, 4: consider all possible groups of missing digits of this size
+         3. If number of empty cells, where these digits are possible, equals group size,
+            remove all other candidates from these cells
+        """
+
         logger.debug("Start Rule #2")
         for block_num in range(9):
             for block_type in Sudoku.BlockType:
@@ -192,40 +189,43 @@ class Sudoku:
 
     def apply_rule_2_one_block(self, block_num: int, block_type: BlockType):
         """Remove possible values based on rule #2 in a single block."""
-        missed_digits = self.get_missed_digits_in_block(block_num, block_type)
-        missed_indexes = self.get_empty_indexes_in_block(block_num, block_type)
 
-        logger.debug("\tRule #2: block %s, type %s. missed = %s, missed_idx = %s", block_num, block_type, missed_digits, missed_indexes)
+        missed_digits = self.get_missed_digits_in_block(block_num, block_type)
+        missed_idx = self.get_empty_indexes_in_block(block_num, block_type)
 
         for group_size in [1, 2, 3, 4]:
-            for group in combinations(missed_digits, group_size):
+            for group_digits in combinations(missed_digits, group_size):
 
-                group_set = set(group)
+                group_digits = set(group_digits)
+                group_cells = [idx for idx in missed_idx if len(self.possible[idx] & group_digits)]
 
-                cells_with_digits_from_group = [
-                    idx for idx in missed_indexes if len(self.possible[idx].intersection(group_set))
-                ]
-
-                if len(cells_with_digits_from_group) == group_size:
-                    logger.debug("\t\tfound group %s, n_cells = %s [%s]", group, len(cells_with_digits_from_group), cells_with_digits_from_group)
-
-                    # remove these digits from other cells:
-                    for idx in missed_indexes:
-                        if idx not in cells_with_digits_from_group:
-                            logger.debug("\t\t update %s idx: old = %s, new = %s", idx, self.possible[idx], self.possible[idx] - group_set)
-                            self.possible[idx] = self.possible[idx] - group_set
-                        else:
-                            logger.debug("\t\t update %s idx: old = %s, new = %s", idx, self.possible[idx], self.possible[idx].intersection(group_set))
-                            self.possible[idx] = self.possible[idx].intersection(group_set)
+                if len(group_cells) == group_size:
+                    # update cells in block
+                    for idx in group_cells:
+                        new = self.possible[idx] & group_digits
+                        if new != self.possible[idx]:
+                            row_, col_ = self.idx_to_row_col(idx)
+                            logger.debug(
+                                "\tUpdate (%s, %s): [%s #%s, group %s]: prev = %s, new = %s",
+                                row_,
+                                col_,
+                                block_type,
+                                block_num,
+                                group_digits,
+                                self.possible[idx],
+                                new,
+                            )
+                            self.possible[idx] = new
 
     def apply_rule_3_one_block(self, block_num: int, bt: BlockType):
+        """Remove possible values based on rule #3 in a single block."""
         missed_digits = self.get_missed_digits_in_block(block_num, bt)
         missed_indexes = self.get_empty_indexes_in_block(block_num, bt)
 
         for digit in missed_digits:
             indexes = [idx for idx in missed_indexes if digit in self.possible[idx]]
 
-            if len(indexes) == 2 or len(indexes) == 3:
+            if 2 <= len(indexes) <= 3:
                 rows = np.array([self.idx_to_row_col(idx)[0] for idx in indexes])
                 cols = np.array([self.idx_to_row_col(idx)[1] for idx in indexes])
                 sqs = np.array([self.row_col_to_square(row, col) for row, col in zip(rows, cols)])
@@ -250,10 +250,37 @@ class Sudoku:
                     indexes_where_to_remove = [idx for idx in empty if idx not in indexes]
 
                 for idx in indexes_where_to_remove:
-                    self.possible[idx].discard(digit)
+                    if digit in self.possible[idx]:
+                        self.possible[idx].discard(digit)
+                        row_, col_ = self.idx_to_row_col(idx)
+                        logger.debug(
+                            "\tUpdate (%s, %s): [%s #%s]: remove digit %s - new = %s",
+                            row_,
+                            col_,
+                            bt,
+                            block_num,
+                            digit,
+                            self.possible[idx],
+                        )
 
     def apply_rule_3(self):
-        """Remove possible values based on rule #3 (applied per block)"""
+        """Remove possible values based on rule #3. Applied per block.
+
+        Details:
+         1. Find all missing digits in the block
+         2. For each missing digits, keep only digits which have two (pair) or three (trio)
+         possible cells
+
+        If a pair/trio is in a square and
+            * in the same row - remove them from the rest of the row
+            * in the same column - remove them from the rest of the column
+
+        If a pair/trio is in a row and
+            * in the same square - remove them from the rest of the square
+
+        If a pair/trio is in a column and
+            * in the same square - remove them from the rest of the square
+        """
 
         logger.debug("Start Rule #3")
         for block_num in range(9):
@@ -276,61 +303,69 @@ class Sudoku:
         return count
 
     def solve(self):
-        it = 0
-        while not self.sudoku_is_solved():
-            logger.info("Iteration: %s", it)
+        """Completely solve sudoku"""
 
-            logger.debug("\n%s\n", str(self))
+        logger.info("Start solving Sudoku")
+
+        max_iter = 100
+        it = 0
+
+        while it < max_iter and not self.sudoku_is_solved():
+            it += 1
+
+            logger.debug("Iteration: %s\n%s\n", it, str(self))
 
             count = 1
-            # insert as many digits with rule 1 as we can
+            # insert as many digits with simple rule as we can
             while count > 0:
                 self.apply_rule_1()
                 count = self.insert_possible_digits()
-                logger.info("Inserted %d digits with Rule #1", count)
+                logger.debug("Inserted %d digits with Rule #1", count)
+
+            if self.sudoku_is_solved():
+                break
 
             self.apply_rule_2()
             count = self.insert_possible_digits()
-            logger.info("Inserted %d digits with Rule #2", count)
+            logger.debug("Inserted %d digits with Rule #2", count)
 
-            if count > 0:
-                it += 1
-                continue
+            if self.sudoku_is_solved():
+                break
 
             self.apply_rule_3()
             count = self.insert_possible_digits()
-            logger.info("Inserted %d digits with Rule #3", count)
-            if count > 0:
-                logger.debug("insert with rule #3\n%s\n", str(self))
-                it += 1
-                continue
+            logger.debug("Inserted %d digits with Rule #3", count)
 
-            it += 1
+        if self.sudoku_is_solved():
+            logger.info("Sudoku solved in %s iterations", it)
+        else:
+            logger.info("Exceed iteration limit")
+            raise ValueError
 
-        self.Print()
-
-        print("Sudoku is solved")
-
-    def Read(self, input_file):
+    def read_from_txt(self, input_file: str):
+        """Read sudoku from txt"""
         with open(input_file, "r") as f:
-            for i, line in enumerate(f):
-                self.data[i] = np.array([int(digit) for digit in line.lstrip().rstrip().split(" ")])
+            for row, line in enumerate(f):
+                digits = [int(d) for d in line.strip().split(" ")]
+                self.data[row] = np.array(digits, dtype=np.int32)
 
-        for i in range(9):
-            for j in range(9):
-                if self.data[i, j] != 0:
-                    self.possible[i * 9 + j] = set()
+                for col in range(9):
+                    if self.data[row, col]:
+                        self.possible[self.row_col_to_idx(row, col)].clear()
 
-    def Print(self):
-        for row in range(9):
-            for col in range(9):
-                print(f"{self.data[row, col]} ", end="")
-            print("\n")
+    def read_sudoku_from_numpy(self, np_array: np.ndarray):
+        shape = np_array.shape
+
+        if shape == (9, 9):
+            self.data = np_array.copy()
+        elif shape == (81,):
+            self.data = np_array.reshape(9, 9)
+        else:
+            raise ValueError(f"Unsupported numpy array shape: {np_array.shape}")
 
 
-# sudoku = Sudoku()
+solver = Sudoku()
 
-# sudoku.Read("input-master.txt")
+solver.read_from_txt("/home/user/Documents/data/sudoku-assistant/data/sudoku-middle.txt")
 
-# sudoku.solve()
-
+solver.solve()
