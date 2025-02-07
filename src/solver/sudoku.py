@@ -318,6 +318,15 @@ class Sudoku:
 
         return count
 
+    def insert_one_possible_digit(self) -> bool:
+        for idx in range(81):
+            row, col = Sudoku.idx_to_row_col(idx)
+            if self.data[row, col] == 0 and len(self.possible[idx]) == 1:
+                self.insert_digit(idx, self.possible[idx].pop())
+                return True
+
+        return False
+
     def solve(self):
         """Completely solve sudoku"""
 
@@ -357,6 +366,40 @@ class Sudoku:
         else:
             logger.info("Exceed iteration limit")
             raise SolverError()
+
+    def solve_one_step(self):
+        """Insert one digit with the simpliest rule"""
+        logger.info("Try one-step solve...")
+        logger.debug("\n%s\n", str(self))
+
+        if self.sudoku_is_solved():
+            return
+
+        self.apply_rule_1()
+        if self.insert_one_possible_digit():
+            logger.debug("Inserted digit with Rule #1")
+            return
+
+        self.apply_rule_2()
+        if self.insert_one_possible_digit():
+            logger.debug("Inserted digit with Rule #2")
+            return
+
+        self.apply_rule_3()
+        if self.insert_one_possible_digit():
+            logger.debug("Inserted digit with Rule #3")
+            return
+
+        for _ in range(2):
+            self.apply_rule_2()
+            self.apply_rule_3()
+
+        if self.insert_one_possible_digit():
+            logger.debug("Inserted digit with Rules #2 and #3")
+            return
+
+        logger.info("Cannot solve one step")
+        raise SolverError()
 
     def read_from_txt(self, input_file: str):
         """Read sudoku from txt"""
