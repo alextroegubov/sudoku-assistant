@@ -1,14 +1,16 @@
 import cv2 as cv
 import streamlit as st
-import matplotlib.pyplot as plt
 import numpy as np
+import logging
 
 from src.image_preprocess import field_extractor, digits_splitter
 from src.classifier import digits_classifier
 from src.utils import cls_output_to_grid
 import src.gui.components as guic
 from src.gui.components import plot_sudoku_grid
+from src.solver import sudoku
 
+from src.exceptions import ImagePreprocessingError, SudokuError
 
 @st.cache_resource
 def load_model():
@@ -28,6 +30,7 @@ def run_app():
     ext = field_extractor.FieldExtractor()
     splitter = digits_splitter.DigitsSplitter()
     classifier = load_model()
+    solver = sudoku.Sudoku()
 
     # Initialize session state variables if not present
     if "grid_to_show" not in st.session_state:
@@ -62,8 +65,8 @@ def run_app():
             st.session_state.sudoku_confirmed = False
             st.session_state.sudoku_solved = False
 
-        except ValueError:
-            st.error("Error: Please upload a clearer image.")
+        except ImagePreprocessingError as e:
+            st.error(f"Error: {e.message}.\n Please upload a clearer image.")
 
     if st.session_state.uploaded:
         # Show extracted Sudoku with a **blue border** before confirmation
@@ -93,13 +96,26 @@ def run_app():
 
         with col1:
             if st.button("🧩 Solve"):
-                st.session_state.grid_to_show = np.ones((9, 9), dtype=int) * 8
+                solver.read_sudoku_from_numpy(st.session_state.grid_to_show)
+                try:
+                    solver.solve()
+                except SudokuError:
+                    st.error("Cannot solve sudoku")
+
+                st.session_state.new_digits = [row * 9 + col for row in range(9) for col in range(9) if solver.data[row, col] != st.session_state.grid_to_show[row, col]]
+
+                st.session_state.grid_to_show = solver.data
                 st.session_state.sudoku_solved = True
-                st.session_state.new_digits = [0, 1, 2, 3, 4, 5, 6, 7, 8]
                 st.rerun()
 
         with col2:
             if st.button("💡 Show Tip") and not st.session_state.sudoku_solved:
-                st.session_state.grid_to_show = np.ones((9, 9), dtype=int)
-                st.session_state.new_digits = [50, 51, 52, 53, 54]
+                solver.read_sudoku_from_numpy(st.session_state.grid_to_show)
+                try:
+                    solver.solve_one_step()
+                except SudokuError:
+                    st.error("Cannot insert any digits")
+
+                st.session_state.new_digits = [row * 9 + col for row in range(9) for col in range(9) if solver.data[row, col] != st.session_state.grid_to_show[row, col]]
+                st.session_state.grid_to_show = solver.data
                 st.rerun()
