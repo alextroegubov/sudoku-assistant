@@ -47,4 +47,4 @@ def test_solver():
 
     for file in files:
         test_solve(file)
-        # test_solve_one_step(file)
+        test_solve_one_step(file)

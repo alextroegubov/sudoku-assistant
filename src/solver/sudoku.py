@@ -465,7 +465,7 @@ class Sudoku:
             # try to solve with human-like methods
             self.solve_human_like()
 
-            if self.sudoku_is_solved():
+            if not self.sudoku_is_solved():
                 # try to solve with assumption
                 self.solve_with_assumptions()
 
@@ -503,7 +503,21 @@ class Sudoku:
             logger.debug("Inserted digit with Rules #2 and #3")
             return
 
-        logger.info("Cannot solve one step with human-like")
+        logger.info("Cannot solve one step with human-like, try assumptions-based")
+
+        self.solve_with_assumptions()
+
+        if self.sudoku_is_solved():
+            # take the first stamp and insert its digit
+            stamp = self.stamps[0]
+            self.data = stamp.field
+            self.possible = stamp.possible
+            self.insert_digit(stamp.cell_idx, stamp.digit)
+            self.stamps.clear()
+
+            row, col = self.idx_to_row_col(stamp.cell_idx)
+            logger.debug("One step assumption: %s in (%s, %s) will be good", stamp.digit, row, col)
+            return
 
         raise SolverError()
 
