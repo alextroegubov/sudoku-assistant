@@ -426,6 +426,36 @@ class Sudoku:
         else:
             logger.info("Cannot solve with human-like methods")
 
+    def solve_with_assumptions(self, max_iter=50):
+        is_valid = True
+        it = 0
+        logger.info("Try to solve with assumptions")
+        while not (is_valid and self.sudoku_is_solved()) and it < max_iter:
+            it += 1
+            if is_valid and not self.sudoku_is_solved():
+                # make assumption: insert random candidate in cell
+                assumption_cell_idx = self.get_cell_idx_with_min_possibles()
+                assumption_digit = list(self.possible[assumption_cell_idx])[0]
+                self.save_stamp_and_make_assumption(assumption_cell_idx, assumption_digit)
+                # try to solve with this assumption
+                try:
+                    self.solve_human_like()
+                except InvalidFieldError:
+                    is_valid = False
+
+            elif not is_valid and self.stamps:
+                self.restore_stamp()
+                is_valid = True
+                try:
+                    self.solve_human_like()
+                except InvalidFieldError:
+                    is_valid = False
+
+        if self.sudoku_is_solved():
+            logger.info("Sudoku solved with assumptions in %s iterations:\n%s\n", it, str(self))
+        else:
+            logger.warning("Cannot solve sudoku wit assumptions:\n%s\n", str(self))
+
     def solve(self):
         """Completely solve sudoku"""
 
@@ -434,41 +464,13 @@ class Sudoku:
         if not self.sudoku_is_solved():
             # try to solve with human-like methods
             self.solve_human_like()
-            if self.sudoku_is_solved():
-                return
-
-            logger.info("Trying to solve with assumptions...")
-
-            is_valid = True
-            max_iter = 100
-            it = 0
-
-            while not (is_valid and self.sudoku_is_solved()) and it < max_iter:
-                it += 1
-                if is_valid and not self.sudoku_is_solved():
-                    # make assumption: insert random candidate in cell
-                    assumption_cell_idx = self.get_cell_idx_with_min_possibles()
-                    assumption_digit = list(self.possible[assumption_cell_idx])[0]
-                    self.save_stamp_and_make_assumption(assumption_cell_idx, assumption_digit)
-                    # try to solve with this assumption
-                    try:
-                        self.solve_human_like()
-                    except InvalidFieldError:
-                        is_valid = False
-
-                elif not is_valid and self.stamps:
-                    self.restore_stamp()
-                    is_valid = True
-                    try:
-                        self.solve_human_like()
-                    except InvalidFieldError:
-                        is_valid = False
 
             if self.sudoku_is_solved():
-                logger.info("Sudoku solved with assumptions in %s iterations:\n%s\n", it, str(self))
-            else:
-                logger.warning("Cannot solve sudoku:\n%s\n", str(self))
-                raise SolverError()
+                # try to solve with assumption
+                self.solve_with_assumptions()
+
+                if not self.sudoku_is_solved():
+                    raise SolverError()
 
     def solve_one_step(self):
         """Insert one digit with the simpliest rule"""
@@ -501,7 +503,8 @@ class Sudoku:
             logger.debug("Inserted digit with Rules #2 and #3")
             return
 
-        logger.info("Cannot solve one step")
+        logger.info("Cannot solve one step with human-like")
+
         raise SolverError()
 
     def read_from_txt(self, input_file: str):
