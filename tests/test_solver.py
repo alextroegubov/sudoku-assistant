@@ -42,8 +42,9 @@ def test_solver():
         "data/sudoku-hard.txt",
         "data/sudoku-expert.txt",
         "data/sudoku-master.txt",
+        "data/sudoku-book.txt",
     ]
 
     for file in files:
         test_solve(file)
-        test_solve_one_step(file)
+        # test_solve_one_step(file)

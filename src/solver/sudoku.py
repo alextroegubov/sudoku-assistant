@@ -1,6 +1,8 @@
 from enum import Enum
 from itertools import combinations
 import logging
+from dataclasses import dataclass
+from copy import deepcopy
 
 import numpy as np
 
@@ -26,6 +28,64 @@ class Sudoku:
         ROW = 1
         COL = 2
         SQ = 3
+
+    @dataclass
+    class SudokuStamp:
+        field: np.ndarray
+        possible: dict[int, set[int]]
+        cell_idx: int
+        digit: int
+
+    def save_stamp_and_make_assumption(self, cell_idx, digit):
+        stamp = Sudoku.SudokuStamp(self.data.copy(), deepcopy(self.possible), cell_idx, digit)
+        self.stamps.append(stamp)
+        # apply assumption and insert digit in cell_idx
+        row, col = self.idx_to_row_col(cell_idx)
+
+        logger.debug(
+            "Save stamp and make assumption: digit %s in (%s, %s). All candidates %s",
+            digit,
+            row,
+            col,
+            self.possible[cell_idx],
+        )
+
+        self.data[row, col] = digit
+        self.possible[cell_idx].clear()
+
+    def restore_stamp(self):
+        if not len(self.stamps):
+            raise ValueError("Empty time stamps")
+
+        stamp = self.stamps.pop()
+        self.data = stamp.field
+        self.possible = stamp.possible
+        # remove tested digit from possible
+        self.possible[stamp.cell_idx].discard(stamp.digit)
+        row, col = self.idx_to_row_col(stamp.cell_idx)
+        logger.debug(
+            "Restore stamp: digit %s in (%s, %s) is bad, %s remain",
+            stamp.digit,
+            row,
+            col,
+            self.possible[stamp.cell_idx],
+        )
+
+    def get_cell_idx_with_min_possibles(self) -> int:
+        min_cell_idx = 100
+        min_possibles = 10
+
+        for idx, possibles in self.possible.items():
+            if len(possibles) == 1:
+                raise ValueError(f"1 possible digit in cell {idx}")
+            elif len(possibles) == 2:
+                return idx
+
+            if len(possibles) < min_possibles:
+                min_cell_idx = idx
+                min_possibles = len(possibles)
+
+        return min_cell_idx
 
     @staticmethod
     def row_col_to_square(row_n: int, col_n: int) -> int:
@@ -58,6 +118,7 @@ class Sudoku:
     def __init__(self):
         self.data: np.ndarray = np.zeros((9, 9), dtype=np.int32)
         self.possible: dict[int, set[int]] = {i: self.all_digits.copy() for i in range(81)}
+        self.stamps: list[Sudoku.SudokuStamp] = []
 
     def __str__(self):
         """String representation of the Sudoku grid."""
@@ -135,14 +196,14 @@ class Sudoku:
         unique_non_zero = np.unique(digits[digits > 0])
 
         if not set(unique_non_zero).issubset(self.all_digits):
-            logger.warning("Invalid sudoku\n%s", str(self))
-            raise InvalidDigitsError(
-                f"{block_type} #{n}: invalid digits: {set(unique_non_zero) - self.all_digits}"
-            )
+            msg = f"{block_type} #{n}: invalid digits: {set(unique_non_zero) - self.all_digits}"
+            logger.debug("Invalid sudoku\n%s\n%s", str(self), msg)
+            raise InvalidDigitsError(msg)
 
         if non_zero_count != len(unique_non_zero):
-            logger.warning("Invalid sudoku\n%s", str(self))
-            raise InvalidFieldError(f"{block_type} #{n}: invalid block")
+            msg = f"{block_type} #{n}: invalid block: {digits}"
+            logger.debug("Invalid sudoku\n%s\n%s", str(self), msg)
+            raise InvalidFieldError(msg)
 
     def sudoku_is_valid(self):
         """Check if sudoku is valid: all block are valid"""
@@ -327,12 +388,10 @@ class Sudoku:
 
         return False
 
-    def solve(self):
-        """Completely solve sudoku"""
+    def solve_human_like(self, max_iter=10):
+        """Solve sudoku with human-like method"""
 
-        logger.info("Start solving Sudoku")
-
-        max_iter = 100
+        logger.info("Solving with human-like methods")
         it = 0
 
         while it < max_iter and not self.sudoku_is_solved():
@@ -362,10 +421,57 @@ class Sudoku:
             logger.debug("Inserted %d digits with Rule #3", count)
 
         if self.sudoku_is_solved():
-            logger.info("Sudoku solved in %s iterations", it)
+            logger.info("Sudoku solved with human-like methods in %s iterations", it)
         else:
-            logger.info("Exceed iteration limit")
-            raise SolverError()
+            logger.info("Cannot solve with human-like methods")
+
+    def solve(self):
+        """Completely solve sudoku"""
+
+        logger.info("Start solving Sudoku")
+
+        if not self.sudoku_is_solved():
+            # try to solve with human-like methods
+            self.solve_human_like()
+            if self.sudoku_is_solved():
+                return
+
+            logger.info("Trying to solve with assumptions...")
+
+            is_valid = True
+            max_iter = 100
+
+            for it in range(max_iter):
+
+                if is_valid and not self.sudoku_is_solved():
+                    # make assumption: insert random candidate in cell
+                    assumption_cell_idx = self.get_cell_idx_with_min_possibles()
+                    assumption_digit = list(self.possible[assumption_cell_idx])[0]
+                    self.save_stamp_and_make_assumption(assumption_cell_idx, assumption_digit)
+                    # try to solve with this assumption
+                    try:
+                        self.solve_human_like()
+                    except InvalidFieldError:
+                        is_valid = False
+                        continue
+
+                elif not is_valid and len(self.stamps) > 0:
+                    self.restore_stamp()
+                    is_valid = True
+                    try:
+                        self.solve_human_like()
+                    except InvalidFieldError:
+                        is_valid = False
+                        continue
+
+                elif is_valid and self.sudoku_is_solved():
+                    break
+
+            if self.sudoku_is_solved():
+                logger.info("Sudoku solved with assumptions in %s iterations:\n%s\n", it, str(self))
+            else:
+                logger.warning("Cannot solve sudoku:\n%s\n", str(self))
+                raise SolverError()
 
     def solve_one_step(self):
         """Insert one digit with the simpliest rule"""
