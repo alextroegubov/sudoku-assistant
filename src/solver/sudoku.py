@@ -54,7 +54,7 @@ class Sudoku:
         self.possible[cell_idx].clear()
 
     def restore_stamp(self):
-        if not len(self.stamps):
+        if not self.stamps:
             raise ValueError("Empty time stamps")
 
         stamp = self.stamps.pop()
@@ -140,7 +140,7 @@ class Sudoku:
         # Show possible candidates for empty cells
         possible_str = "\nPossible Candidates:\n"
         for idx, candidates in sorted(self.possible.items()):
-            if len(candidates) > 0:
+            if candidates:
                 row, col = self.idx_to_row_col(idx)
                 possible_str += f"({row}, {col}): {sorted(candidates)}\n"
 
@@ -214,7 +214,7 @@ class Sudoku:
     def block_is_solved(self, n: int, block_type: BlockType) -> bool:
         """Check if n-th sudoku block is solved"""
         empty_cells = self.get_empty_indexes_in_block(n, block_type)
-        return len(empty_cells) == 0
+        return not empty_cells
 
     def sudoku_is_solved(self) -> bool:
         """Check if sudoku is solved: all blocks are solved"""
@@ -275,7 +275,8 @@ class Sudoku:
             for group_digits in combinations(missed_digits, group_size):
 
                 group_digits = set(group_digits)
-                group_cells = [idx for idx in missed_idx if len(self.possible[idx] & group_digits)]
+                # if intersection is not empty
+                group_cells = [idx for idx in missed_idx if (self.possible[idx] & group_digits)]
 
                 if len(group_cells) == group_size:
                     # update cells in block
@@ -440,9 +441,10 @@ class Sudoku:
 
             is_valid = True
             max_iter = 100
+            it = 0
 
-            for it in range(max_iter):
-
+            while not (is_valid and self.sudoku_is_solved()) and it < max_iter:
+                it += 1
                 if is_valid and not self.sudoku_is_solved():
                     # make assumption: insert random candidate in cell
                     assumption_cell_idx = self.get_cell_idx_with_min_possibles()
@@ -453,19 +455,14 @@ class Sudoku:
                         self.solve_human_like()
                     except InvalidFieldError:
                         is_valid = False
-                        continue
 
-                elif not is_valid and len(self.stamps) > 0:
+                elif not is_valid and self.stamps:
                     self.restore_stamp()
                     is_valid = True
                     try:
                         self.solve_human_like()
                     except InvalidFieldError:
                         is_valid = False
-                        continue
-
-                elif is_valid and self.sudoku_is_solved():
-                    break
 
             if self.sudoku_is_solved():
                 logger.info("Sudoku solved with assumptions in %s iterations:\n%s\n", it, str(self))
