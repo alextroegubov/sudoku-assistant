@@ -1,11 +1,12 @@
 from enum import Enum
 from itertools import combinations
-import logging
 from dataclasses import dataclass
 from copy import deepcopy
 
 import numpy as np
 
+
+from src.utils import get_logger
 from src.exceptions import (
     InvalidInputError,
     InvalidDigitsError,
@@ -13,8 +14,7 @@ from src.exceptions import (
     SolverError,
 )
 
-logger = logging.getLogger(__name__)
-logging.basicConfig(filename="sudoku.log", filemode="w", level=logging.DEBUG, encoding="utf-8")
+logger = get_logger(__name__)
 
 
 class Sudoku:
