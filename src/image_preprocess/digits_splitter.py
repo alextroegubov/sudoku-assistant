@@ -1,19 +1,27 @@
 """Module for splitting sudoku field into digits"""
 
+from abc import ABC, abstractmethod
 import numpy as np
 import cv2 as cv
 
+from src.utils import get_logger, save_debug_image
 
-class DigitsSplitter:
+logger = get_logger(__name__)
+
+
+class DigitsSplitter(ABC):
+    @abstractmethod
+    def __call__(self, image: np.ndarray, with_not_nones: bool = False):
+        raise NotImplementedError
+
+
+class SimpleSplitter(DigitsSplitter):
 
     MARGIN = 0.05
     MIN_CNTR_AREA = 10
 
-    def __init__(self):
-        self.image = np.zeros((10, 10))
-
-    def split_into_digits(self):
-        height, width = self.image.shape
+    def split_into_digits(self, image: np.ndarray):
+        height, width = image.shape
         # approximate cell size
         x_step = width / 9
         y_step = height / 9
@@ -33,25 +41,21 @@ class DigitsSplitter:
                 x1 = int(x + m_x)
                 x2 = int(x + x_step - m_x)
 
-                roi = self.image[y1:y2, x1:x2]
+                roi = image[y1:y2, x1:x2]
                 roi_area = np.prod(roi.shape)
 
                 cntrs, _ = cv.findContours(roi, cv.RETR_TREE, cv.CHAIN_APPROX_NONE)
                 cntrs_area = np.array([cv.contourArea(cntr) for cntr in cntrs])
 
-                if (
-                    len(cntrs) == 0
-                    or len(cntrs) > 4
-                    or cntrs_area.max() < self.MIN_CNTR_AREA
-                ):
+                if len(cntrs) == 0 or len(cntrs) > 4 or cntrs_area.max() < self.MIN_CNTR_AREA:
                     lst_digits.append(None)
                 else:
                     lst_digits.append(roi.copy())
 
         return lst_digits
 
-    def __call__(self, image: np.ndarray, with_not_nones: bool = False):
-        self.image = image
+    def __call__(self, image_: np.ndarray, with_not_nones: bool = False):
+        image = image_.copy()
 
         all_digits = self.split_into_digits()
         if with_not_nones:
