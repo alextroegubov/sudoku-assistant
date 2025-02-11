@@ -2,8 +2,15 @@
 
 import numpy as np
 import cv2 as cv
+import datetime
+from pathlib import Path
 
 from src.exceptions import NoContoursError, NoRectContour
+from src.utils import get_logger, save_debug_image
+
+
+logger = get_logger(__name__)
+
 
 class FieldExtractor:
     """Class for extracting field from the image"""
@@ -15,6 +22,7 @@ class FieldExtractor:
     def __init__(self):
         self.original_image = np.zeros((10, 10), dtype=np.uint8)
         self.image = np.zeros((10, 10), dtype=np.uint8)
+        self.filestem: str = ""
 
     def dist(self, pt1, pt2):
         """L2 distance"""
@@ -68,6 +76,7 @@ class FieldExtractor:
 
         # make grid mask solid
         mask = cv.morphologyEx(mask, cv.MORPH_CLOSE, np.ones((3, 3)))
+        save_debug_image(mask, Path(self.filestem + "grid_mask").with_suffix(".jpg"))
         # apply mask to remove grid
         self.image = cv.bitwise_and(self.image, cv.bitwise_not(mask))
 
@@ -157,12 +166,22 @@ class FieldExtractor:
         self.image = cv.erode(self.image, np.ones((3, 3)))
 
     def get_sudoku_field(self):
+        save_debug_image(self.image, Path(self.filestem + "_orig").with_suffix(".jpg"))
         self.image_preprocess()
+        save_debug_image(self.image, Path(self.filestem + "_preproc").with_suffix(".jpg"))
         self.crop_sudoku_field()
+        save_debug_image(self.image, Path(self.filestem + "_field").with_suffix(".jpg"))
         self.remove_grid()
+        save_debug_image(self.image, Path(self.filestem + "_clear_field").with_suffix(".jpg"))
         self.image_postprocess()
+        save_debug_image(self.image, Path(self.filestem + "_postproc").with_suffix(".jpg"))
 
     def __call__(self, image: np.ndarray):
+
+        file_id = hash(datetime.datetime.now().strftime("%Y-%m-%d_%H:%M:%S"))
+        logger.info("Apply field extractor. File id %s", file_id)
+
+        self.filestem = f"{self.__class__.__name__}_{file_id}"
         self.image = image.copy()
         self.get_sudoku_field()
         return self.image
