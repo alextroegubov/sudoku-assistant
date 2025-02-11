@@ -28,7 +28,7 @@ def run_app():
     st.title("🧩 Sudoku Assistant")
 
     ext = field_extractor.FieldExtractor()
-    splitter = digits_splitter.DigitsSplitter()
+    splitter = digits_splitter.SimpleSplitter()
     classifier = load_model()
     solver = sudoku.Sudoku()
 
