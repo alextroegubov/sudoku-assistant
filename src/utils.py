@@ -34,12 +34,10 @@ def setup_logging():
         level=logging.INFO,
         format=LOG_FORMAT,
         handlers=[
-            logging.FileHandler(LOG_FILE, mode="w"),
+            logging.FileHandler(LOG_FILE, mode="w", encoding='utf-8'),
             # logging.StreamHandler(),
         ],
     )
-
-setup_logging()
 
 
 def get_logger(module_name: str):
@@ -47,12 +45,12 @@ def get_logger(module_name: str):
     return logging.getLogger(module_name)
 
 
-def save_debug_image(image: np.ndarray, filename: str, description: str = ""):
+def save_debug_image(image: np.ndarray, filename: Path, description: str = ""):
     """Save an image for debugging and log the action."""
     logger = get_logger(__name__)  # Get logger for this module
 
     if image is None:
-        logger.warning(f"Attempted to save a None image: {filename}")
+        logger.warning(f"Attempted to save a None image: {filename.name}")
         return
 
     save_path = IMG_LOG_DIR / filename
@@ -61,4 +59,7 @@ def save_debug_image(image: np.ndarray, filename: str, description: str = ""):
     if success:
         logger.info(f"Saved image: {save_path} - {description}")
     else:
-        logger.error(f"Failed to save image: {filename}")
+        logger.error(f"Failed to save image: {filename.name}")
+
+
+setup_logging()
