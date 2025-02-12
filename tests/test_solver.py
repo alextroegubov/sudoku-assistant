@@ -1,50 +1,39 @@
 import numpy as np
+import pytest
+from pathlib import Path
+
 from src.solver import sudoku
-from src.exceptions import SudokuError
+
+# Path to the test cases folder
+TEST_SOLVER_CASES_DIR = Path(__file__).parent / "test_solver_cases"
+sudoku_txt_files = list(TEST_SOLVER_CASES_DIR.glob("*.txt"))
 
 
-def test_solve(file):
-    try:
-        solver = sudoku.Sudoku()
-        solver.read_from_txt(file)
-        solver.solve()
-    except SudokuError as e:
-        print(f"Test <test_solve> with {file} failed:", e.message)
-    else:
-        print(f"Test <test_solve> with {file} passed")
+@pytest.mark.parametrize("filename", sudoku_txt_files)
+def test_solve(filename):
+
+    solver = sudoku.Sudoku()
+    solver.read_from_txt(filename)
+    solver.solve()
+
+    assert solver.sudoku_is_solved(), f"Sudoku in {filename.name} failed to solve"
 
 
-def test_solve_one_step(file):
-    try:
-        solver = sudoku.Sudoku()
-        solver.read_from_txt(file)
+@pytest.mark.parametrize("filename", sudoku_txt_files)
+def test_solve_one_step(filename):
+    solver = sudoku.Sudoku()
+    solver.read_from_txt(filename)
+
+    sudoku_copy = solver.data.copy()
+
+    num_steps = len(sudoku_copy[sudoku_copy == 0])
+
+    for step in range(num_steps):
+        solver.solve_one_step()
+        assert (
+            np.count_nonzero(sudoku_copy - solver.data) == 1
+        ), f"Inserted more or less than one digit at step {step}"
 
         sudoku_copy = solver.data.copy()
 
-        while not solver.sudoku_is_solved():
-            solver.solve_one_step()
-            # exactrly one new digit
-            if np.count_nonzero(sudoku_copy - solver.data) != 1:
-                print(f"Test <test_solve_one_step> with {file} failed: more than 1 digits changed")
-                return
-
-            sudoku_copy = solver.data.copy()
-
-    except SudokuError as e:
-        print(f"Test <test_solve_one_step> with {file} failed:", e.message)
-    else:
-        print(f"Test <test_solve_one_step> with {file} passed")
-
-
-def test_solver():
-    files = [
-        "data/sudoku-middle.txt",
-        "data/sudoku-hard.txt",
-        "data/sudoku-expert.txt",
-        "data/sudoku-master.txt",
-        "data/sudoku-book.txt",
-    ]
-
-    for file in files:
-        test_solve(file)
-        test_solve_one_step(file)
+    assert solver.sudoku_is_solved(), f"Sudoku in {filename.name} failed to solve"
