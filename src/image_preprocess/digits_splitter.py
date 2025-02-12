@@ -1,13 +1,13 @@
 """Module for splitting sudoku field into digits"""
 
 from abc import ABC, abstractmethod
-import datetime
 from pathlib import Path
+import logging
 
 import numpy as np
 import cv2 as cv
 
-from src.utils import get_logger, save_debug_image
+from src.utils import get_logger, save_debug_image, get_image_hash
 
 
 logger = get_logger(__name__)
@@ -22,7 +22,6 @@ class DigitsSplitter(ABC):
 class SimpleSplitter(DigitsSplitter):
 
     MARGIN = 0.05
-    MIN_CNTR_AREA = 10
 
     def __init__(self):
         super().__init__()
@@ -49,31 +48,57 @@ class SimpleSplitter(DigitsSplitter):
                 x1 = int(x + m_x)
                 x2 = int(x + x_step - m_x)
 
+                # binary image here after extractor
                 roi = image[y1:y2, x1:x2].copy()
+                min_area = 1 / 36 * np.prod(roi.shape)
+                min_arc = roi.shape[0]
+
+                # take external contours, find perimetr and area
+                cntrs, _ = cv.findContours(roi, cv.RETR_EXTERNAL, cv.CHAIN_APPROX_NONE)
+                cntrs_area = np.array([cv.contourArea(cntr) for cntr in cntrs])
+                cntrs_arcs = np.array([cv.arcLength(cntr, closed=True) for cntr in cntrs])
+
+                # mask to remove too small contours as noise:
+                cntrs_mask = np.zeros_like(roi)
+                noise_contours = [
+                    cntr
+                    for cntr, arc, area in zip(cntrs, cntrs_area, cntrs_arcs)
+                    if area < min_area and arc < min_arc
+                ]
+                cv.drawContours(cntrs_mask, noise_contours, -1, color=255, thickness=cv.FILLED)
+
+                roi = cv.bitwise_and(roi, cv.bitwise_not(cntrs_mask))
+
+                if logger.isEnabledFor(logging.DEBUG):
+                    image[y1:y2, x1:x2] = roi
 
                 cntrs, _ = cv.findContours(roi, cv.RETR_TREE, cv.CHAIN_APPROX_NONE)
                 cntrs_area = np.array([cv.contourArea(cntr) for cntr in cntrs])
 
-                if len(cntrs) == 0 or len(cntrs) > 4 or cntrs_area.max() < self.MIN_CNTR_AREA:
-                    digit = None
-                else:
-                    digit = roi
+                digit = None if len(cntrs) == 0 or len(cntrs) > 4 else roi
 
                 save_debug_image(
-                    roi, Path(self.filestem + f"_{i_y}_{i_x}_{digit is not None}").with_suffix(".jpg")
+                    roi,
+                    Path(self.filestem + f"_{i_y}_{i_x}_{digit is not None}").with_suffix(".jpg"),
+                    logging.DEBUG,
                 )
-
                 lst_digits.append(digit)
+
+        save_debug_image(
+            image, Path(self.filestem + f"_roi_correction").with_suffix(".jpg"), logging.DEBUG
+        )
 
         return lst_digits
 
     def __call__(self, image: np.ndarray, with_not_nones: bool = False):
 
-        file_id = hash(datetime.datetime.now().strftime("%Y-%m-%d_%H:%M:%S"))
+        file_id = get_image_hash(image)
         logger.info("Use %s as splitter. Recognition file id %s", self.__class__.__name__, file_id)
 
         self.filestem = f"{self.__class__.__name__}_{file_id}"
-        save_debug_image(image, Path(self.filestem).with_suffix(".jpg"), "Image before splitting")
+        save_debug_image(
+            image, Path(self.filestem).with_suffix(".jpg"), logging.INFO, "Image before splitting"
+        )
 
         all_digits = self.split_into_digits(image)
         if with_not_nones:
