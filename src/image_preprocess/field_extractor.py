@@ -2,11 +2,11 @@
 
 import numpy as np
 import cv2 as cv
-import datetime
 from pathlib import Path
+import logging
 
 from src.exceptions import NoContoursError, NoRectContour
-from src.utils import get_logger, save_debug_image
+from src.utils import get_logger, save_debug_image, get_image_hash
 
 
 logger = get_logger(__name__)
@@ -76,7 +76,9 @@ class FieldExtractor:
 
         # make grid mask solid
         mask = cv.morphologyEx(mask, cv.MORPH_CLOSE, np.ones((3, 3)))
-        save_debug_image(mask, Path(self.filestem + "grid_mask").with_suffix(".jpg"))
+        save_debug_image(
+            mask, Path(self.filestem + "_grid_mask").with_suffix(".jpg"), logging.DEBUG
+        )
         # apply mask to remove grid
         self.image = cv.bitwise_and(self.image, cv.bitwise_not(mask))
 
@@ -164,21 +166,32 @@ class FieldExtractor:
     def image_postprocess(self):
         self.image = cv.morphologyEx(self.image, cv.MORPH_CLOSE, kernel=np.ones((3, 3)))
         self.image = cv.erode(self.image, np.ones((3, 3)))
+        _, self.image = cv.threshold(self.image, 1, 255, cv.THRESH_BINARY)
 
     def get_sudoku_field(self):
-        save_debug_image(self.image, Path(self.filestem + "_orig").with_suffix(".jpg"))
+        save_debug_image(
+            self.image, Path(self.filestem + "_orig").with_suffix(".jpg"), logging.INFO
+        )
         self.image_preprocess()
-        save_debug_image(self.image, Path(self.filestem + "_preproc").with_suffix(".jpg"))
+        save_debug_image(
+            self.image, Path(self.filestem + "_preproc").with_suffix(".jpg"), logging.DEBUG
+        )
         self.crop_sudoku_field()
-        save_debug_image(self.image, Path(self.filestem + "_field").with_suffix(".jpg"))
+        save_debug_image(
+            self.image, Path(self.filestem + "_field").with_suffix(".jpg"), logging.DEBUG
+        )
         self.remove_grid()
-        save_debug_image(self.image, Path(self.filestem + "_clear_field").with_suffix(".jpg"))
+        save_debug_image(
+            self.image, Path(self.filestem + "_clear_field").with_suffix(".jpg"), logging.DEBUG
+        )
         self.image_postprocess()
-        save_debug_image(self.image, Path(self.filestem + "_postproc").with_suffix(".jpg"))
+        save_debug_image(
+            self.image, Path(self.filestem + "_postproc").with_suffix(".jpg"), logging.INFO
+        )
 
     def __call__(self, image: np.ndarray):
 
-        file_id = hash(datetime.datetime.now().strftime("%Y-%m-%d_%H:%M:%S"))
+        file_id = get_image_hash(image)
         logger.info("Apply field extractor. File id %s", file_id)
 
         self.filestem = f"{self.__class__.__name__}_{file_id}"

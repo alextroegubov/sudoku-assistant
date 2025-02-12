@@ -60,9 +60,12 @@ def get_logger(module_name: str):
     return logging.getLogger(module_name)
 
 
-def save_debug_image(image: np.ndarray, filename: Path, description: str = ""):
+def save_debug_image(image: np.ndarray, filename: Path, logging_level: int, description: str = ""):
     """Save an image for debugging and log the action."""
     logger = get_logger(__name__)  # Get logger for this module
+
+    if not logger.isEnabledFor(logging_level):
+        return
 
     if image is None:
         logger.warning(f"Attempted to save a None image: {filename.name}")
