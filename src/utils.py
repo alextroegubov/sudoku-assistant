@@ -2,6 +2,7 @@ import numpy as np
 import logging
 from pathlib import Path
 import cv2 as cv
+import datetime
 
 
 def cls_output_to_grid(confs, labels, all_digits, threshold=0.8):
@@ -17,10 +18,24 @@ def cls_output_to_grid(confs, labels, all_digits, threshold=0.8):
     return sudoku_grid.reshape((9, 9))
 
 
+def get_image_hash(image: np.ndarray) -> int:
+    """Get custom hash of image for logging files"""
+    data_hash = hash(datetime.datetime.now().strftime("%Y-%m-%d_%H:%M:%S"))
+    image_hash = hash(np.sum(image.astype(np.uint64)))
+
+    return hash((data_hash, image_hash))
+
+
 # Logging setup
 LOG_DIR = Path.cwd() / "logs"
 LOG_FILE = LOG_DIR / "sudoku-assistant.log"
 IMG_LOG_DIR = LOG_DIR / "images"
+
+if IMG_LOG_DIR.exists():
+    for file in IMG_LOG_DIR.glob('*'):
+        file.unlink()
+    IMG_LOG_DIR.rmdir()
+
 IMG_LOG_DIR.mkdir(parents=True, exist_ok=True)
 
 LOG_FORMAT = "%(asctime)s - %(levelname)s - %(name)s: %(message)s"
