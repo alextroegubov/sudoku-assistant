@@ -1,29 +1,42 @@
-class ImagePreprocessingError(Exception):
-    """Base class for exceptions in image processing."""
+"""Module with custom exceptions classes"""
 
-    pass
+
+class SudokuAssistantError(Exception):
+    """Base class for all exceptions in the project."""
+
+    def __init__(self, message: str):
+        super().__init__(message)
+
+
+class ImagePreprocessingError(SudokuAssistantError):
+    """Base class for all image preprocessing exceptions."""
+
+    def __init__(self, message: str = "Error during image processing"):
+        super().__init__(message)
 
 
 class NoContoursError(ImagePreprocessingError):
     """Raised when no contours are detected in the image."""
 
-    def __init__(self, message="No contours detected in the image."):
-        self.message = message
-        super().__init__(self.message)
-
 
 class NoRectContour(ImagePreprocessingError):
     """Raised when no rectangular contour is found."""
 
-    def __init__(self, message="Failed to detect a rectangular Sudoku grid in the image."):
-        self.message = message
-        super().__init__(self.message)
+
+class NoGridLinesDetected(ImagePreprocessingError):
+    """Raised when no grid lines are detected."""
+
+
+class InvalidImageError(ImagePreprocessingError):
+    """Raised when the input image is invalid."""
+
+
+class OpenCvError(ImagePreprocessingError):
+    """Raised when an OpenCV error occurs."""
 
 
 class SudokuError(Exception):
     """Base class for exception during sudoku solving"""
-
-    pass
 
 
 class InvalidInputError(SudokuError):
@@ -56,3 +69,9 @@ class SolverError(SudokuError):
     def __init__(self, message="Cannot solve puzzle"):
         self.message = message
         super().__init__(self.message)
+
+
+class ClassificationError(Exception):
+    """Base class for exceptions in image processing."""
+
+    pass
