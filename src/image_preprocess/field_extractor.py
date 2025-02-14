@@ -201,8 +201,8 @@ class FieldExtractor:
         ]
 
         for suffix, log_level, method in steps:
-            save_debug_image(self.image, Path(self.filestem + suffix + ".jpg"), log_level)
             method()
+            save_debug_image(self.image, Path(self.filestem + suffix + ".jpg"), log_level)
 
     def __call__(self, image: np.ndarray):
 
