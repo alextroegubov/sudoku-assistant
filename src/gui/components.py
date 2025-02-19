@@ -13,17 +13,30 @@ IMAGE_HELP_MESSAGE = (
 
 IMAGE_TYPES = ["png", "jpg", "jpeg"]
 
+BUTTON_SOLVE = "🧩 Solve"
+SHOW_TIP = "💡 Show Tip"
+
+
 GRID_COLOR = "black"
 DIGITS_COLOR = "black"
 BORDER_COLOR = "black"
 
 UPLOAD_BORDER_COLOR = "blue"
-TIP_DIGITS_COLOR = "green"
+INSERTED_DIGIT_COLOR = "green"
+TIP_DIGIT_COLOR = "red"
+
+DIGITS_TXT_PARAMS = {
+    "ha": "center",
+    "va": "center",
+    "fontsize": 16,
+    "fontweight": "bold",
+}
 
 
 def plot_sudoku_grid(
-    sudoku_array: np.ndarray,
-    tip_indexes: list[int],
+    sudoku_grid: np.ndarray,
+    orig_sudoku_grid: np.ndarray,
+    tip_idx: int,
     border: bool = False,
 ):
     """Plot a 9x9 Sudoku grid with optional border color."""
@@ -35,22 +48,17 @@ def plot_sudoku_grid(
         ax.axhline(i, color=GRID_COLOR, linewidth=lw)
         ax.axvline(i, color=GRID_COLOR, linewidth=lw)
 
-    # Fill in numbers
     for idx in range(81):
         row, col = divmod(idx, 9)
-        num = sudoku_array[row, col]
-        color = TIP_DIGITS_COLOR if idx in tip_indexes else DIGITS_COLOR
-        if num:  # Skip empty cells (0)
-            ax.text(
-                col + 0.5,
-                8.5 - row,
-                str(num),
-                ha="center",
-                va="center",
-                fontsize=16,
-                fontweight="bold",
-                color=color,
-            )
+        # plot orig_sudoku_grid
+        num = orig_sudoku_grid[row, col]
+        if num:
+            ax.text(col + 0.5, 8.5 - row, str(num), color=DIGITS_COLOR, **DIGITS_TXT_PARAMS)
+        # plot delta grid
+        num = sudoku_grid[row, col] - orig_sudoku_grid[row, col]
+        color = TIP_DIGIT_COLOR if idx == tip_idx else INSERTED_DIGIT_COLOR
+        if num:
+            ax.text(col + 0.5, 8.5 - row, str(num), color=color, **DIGITS_TXT_PARAMS)
 
     # Draw outer border manually with correct thickness
     border_color = UPLOAD_BORDER_COLOR if border else BORDER_COLOR

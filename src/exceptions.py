@@ -36,7 +36,7 @@ class OpenCvError(ImagePreprocessingError):
     """Raised when an OpenCV error occurs."""
 
 
-class SudokuError(Exception):
+class SudokuError(SudokuAssistantError):
     """Base class for exception during sudoku solving"""
 
 
