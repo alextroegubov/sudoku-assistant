@@ -5,13 +5,14 @@ class SudokuAssistantError(Exception):
     """Base class for all exceptions in the project."""
 
     def __init__(self, message: str):
+        self.message = message
         super().__init__(message)
 
 
 class ImagePreprocessingError(SudokuAssistantError):
     """Base class for all image preprocessing exceptions."""
 
-    def __init__(self, message: str = "Error during image processing"):
+    def __init__(self, message: str = "Image Preprocessing Error"):
         super().__init__(message)
 
 
@@ -19,11 +20,11 @@ class NoContoursError(ImagePreprocessingError):
     """Raised when no contours are detected in the image."""
 
 
-class NoRectContour(ImagePreprocessingError):
+class NoRectContourError(ImagePreprocessingError):
     """Raised when no rectangular contour is found."""
 
 
-class NoGridLinesDetected(ImagePreprocessingError):
+class NoGridLinesDetectedError(ImagePreprocessingError):
     """Raised when no grid lines are detected."""
 
 

@@ -5,7 +5,13 @@ import cv2 as cv
 from pathlib import Path
 import logging
 
-from src.exceptions import NoContoursError, NoRectContour, NoGridLinesDetected, InvalidImageError, OpenCvError
+from src.exceptions import (
+    NoContoursError,
+    NoRectContourError,
+    NoGridLinesDetectedError,
+    InvalidImageError,
+    OpenCvError,
+)
 from src.utils import get_logger, save_debug_image, get_image_hash
 
 
@@ -103,7 +109,7 @@ class FieldExtractor:
         lines = self._detect_hough_lines(height)
 
         if lines is None or len(lines) < 3:
-            raise NoGridLinesDetected("Less than 3 grid lines detected")
+            raise NoGridLinesDetectedError("Less than 3 grid lines detected")
 
         # apply grid mask to remove grid
         grid_mask = self._create_grid_lines_mask(lines)
@@ -142,7 +148,7 @@ class FieldExtractor:
             if len(corner_points) == 4:
                 return corner_points
 
-        raise NoRectContour()
+        raise NoRectContourError()
 
     def remove_perspective(self, corners: np.ndarray):
         """Remove perspective with homography matrix"""
@@ -207,7 +213,9 @@ class FieldExtractor:
     def __call__(self, image: np.ndarray):
 
         if image.size == 0:
-            raise InvalidImageError(f"Invalid image data: shape = {image.shape}, size = {image.size}")
+            raise InvalidImageError(
+                f"Invalid image data: shape = {image.shape}, size = {image.size}"
+            )
 
         file_id = get_image_hash(image)
         logger.info("Apply field extractor. File id %s", file_id)
