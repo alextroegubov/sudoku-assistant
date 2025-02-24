@@ -34,9 +34,16 @@ The **Sudoku Assistant** is a Python-based application that combines classical c
 ---
 
 ### 📖 How to Use
+0. **Run tests**:
+    ```bash
+    PYTHONPATH=. pytest
+    ```
+
+    TBD: one test fails for classificator
+
 1. **Run the Streamlit UI**:
    ```bash
-   streamlit run src/gui/app.py
+   streamlit run main.py
    ```
 
 2. **Upload an image**:  
@@ -56,13 +63,36 @@ The **Sudoku Assistant** is a Python-based application that combines classical c
 
 Technological stack: OpenCV, PyTorch, streamlit
 
-- **Image Processing**: Uses OpenCV to preprocess images, remove the grid, and extract digits.
-- **Digit Classification**: A convolutional neural network (CNN) trained with `timm` classifies digits 1-9.
-- **Sudoku Solver**: Implements a backtracking algorithm with optional step-by-step solving.
-- **GUI**: Streamlit provides an intuitive web interface.
+- **Image Processing**: OpenCV
+
+    The aim of preprocessing is to extract and prepare images of digits for classification.
+    
+    The *first step* is field extraction: grayscale convertion, gaussian blur, adaptive thresholding, selecting the largest rectangular contour, perspective correction, grid lines removal. Finally, morphological operations and binary thresholding are performed.
+
+    The *second step* is digits extraction: splitting field into cells, removing noise for each cell, simple filtering to skip empty or too noise cells.
+
+- **Digit Classification**: timm, PyTorch
+
+    Classification of digits into nine classes (1-9) with CNN (mobilenet v2). Both printed and hand-written (with my hand :)) digits are recognized.
+
+- **Sudoku Solver**: Python, numpy
+
+    TBD
+- **GUI**: streamlit
+
+    Simple web-interface for demonstration
 
 ---
 
+## Ongoing improvements
+* Extend dataset with more hand-written digits
+* Add 0 class for an emtpy cell, train new classificator. Check confidence values
+* Update and commit training scripts
+* Show not only the best next move, but also some tip message to prove the move
+* Consider digits classification with classical CV approach (at least for printed digits), maybe stack some models to improve stability
+* Add tests for invalid input examples
+---
+
 ## 🎥 Demo
-*Include a GIF or screenshot showcasing the app in action.*
+TBD
 
