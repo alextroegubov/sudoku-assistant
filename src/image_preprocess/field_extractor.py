@@ -5,13 +5,8 @@ import cv2 as cv
 from pathlib import Path
 import logging
 
-from src.exceptions import (
-    NoContoursError,
-    NoRectContourError,
-    NoGridLinesDetectedError,
-    InvalidImageError,
-    OpenCvError,
-)
+from src.exceptions import InvalidImageError, FieldExtractionError, OpenCvError
+
 from src.utils import get_logger, save_debug_image, get_image_hash
 
 
@@ -26,6 +21,15 @@ class FieldExtractor:
     ADA_THRESH_BLOCK_SIZE = 25
     ADA_THRESH_C = 10
     GAUSS_KERNEL = (5, 5)
+
+    # max aspect ration w/h
+    MAX_ASPECT_RATIO_TOL = 0.25
+    # min size 40px * 9 digits = 360 px
+    MIN_FIELD_SIDE_SIZE = 360
+    # minimum number of detected lines
+    MIN_LINES_DETECTED = 15
+    # minimum number of contours in grid
+    MIN_CNTRS_IN_GRID = 40
 
     # lines extraction
     VERTICAL_ANGLE_THRESHOLD = 80
@@ -55,7 +59,7 @@ class FieldExtractor:
         max_line_gap = 5
 
         lines = cv.HoughLinesP(
-            self.image, 1, np.pi / 180, 200, minLineLength=min_line_length, maxLineGap=max_line_gap
+            self.image, 2, np.pi / 180, 200, minLineLength=min_line_length, maxLineGap=max_line_gap
         )
 
         return lines
@@ -108,11 +112,19 @@ class FieldExtractor:
         # Detect lines
         lines = self._detect_hough_lines(height)
 
-        if lines is None or len(lines) < 3:
-            raise NoGridLinesDetectedError("Less than 3 grid lines detected")
+        logging.info("%s", len(lines))
+
+        if lines is None or len(lines) < self.MIN_LINES_DETECTED:
+            raise FieldExtractionError(f"Detected less than {self.MIN_LINES_DETECTED} grid lines")
 
         # apply grid mask to remove grid
         grid_mask = self._create_grid_lines_mask(lines)
+        cntrs, _ = cv.findContours(self.image, cv.RETR_LIST, cv.CHAIN_APPROX_SIMPLE)
+        if len(cntrs) < self.MIN_CNTRS_IN_GRID:
+            raise InvalidImageError(
+                f"Detected {len(cntrs)} contours out of {self.MIN_CNTRS_IN_GRID} in grid"
+            )
+
         self.image = cv.bitwise_and(self.image, cv.bitwise_not(grid_mask))
 
     def image_preprocess(self):
@@ -135,11 +147,21 @@ class FieldExtractor:
         self.remove_perspective(rect_corners)
         # make grid and digits more solid
         self.image = cv.morphologyEx(self.image, cv.MORPH_CLOSE, np.ones((3, 3), np.uint8))
+        self.image = cv.threshold(self.image, 1, 255, cv.THRESH_BINARY)[1]
+        # check aspect ratio and and size of the field
+        h, w = self.image.shape
+
+        if abs(w / h - 1) > self.MAX_ASPECT_RATIO_TOL:
+            save_debug_image(self.image, Path(self.filestem + "invalid" + ".jpg"), logging.INFO)
+            raise FieldExtractionError(f"Invalid aspect ratio for sudoku field: {w / h:.3}")
+        elif min(h, w) < self.MIN_FIELD_SIDE_SIZE:
+            save_debug_image(self.image, Path(self.filestem + "invalid" + ".jpg"), logging.INFO)
+            raise FieldExtractionError(f"Invalid sudoku field size: ({w}, {h})")
 
     def select_best_countour(self, cntrs: np.ndarray):
         """Select the largest contour which can be approximated with 4 points"""
         if not cntrs:
-            raise NoContoursError()
+            raise FieldExtractionError("No best contour for sudoku grid found")
 
         for cntr in sorted(cntrs, key=cv.contourArea, reverse=True):
             epsilon = self.FIELD_ARC_EPSILON * cv.arcLength(cntr, closed=True)
@@ -148,7 +170,7 @@ class FieldExtractor:
             if len(corner_points) == 4:
                 return corner_points
 
-        raise NoRectContourError()
+        raise FieldExtractionError("No rectangular contour for sudoku grid found")
 
     def remove_perspective(self, corners: np.ndarray):
         """Remove perspective with homography matrix"""

@@ -16,16 +16,8 @@ class ImagePreprocessingError(SudokuAssistantError):
         super().__init__(message)
 
 
-class NoContoursError(ImagePreprocessingError):
-    """Raised when no contours are detected in the image."""
-
-
-class NoRectContourError(ImagePreprocessingError):
-    """Raised when no rectangular contour is found."""
-
-
-class NoGridLinesDetectedError(ImagePreprocessingError):
-    """Raised when no grid lines are detected."""
+class FieldExtractionError(ImagePreprocessingError):
+    """Raised on error in field extraction process"""
 
 
 class InvalidImageError(ImagePreprocessingError):
