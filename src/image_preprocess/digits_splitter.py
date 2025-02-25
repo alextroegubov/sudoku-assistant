@@ -8,7 +8,7 @@ import numpy as np
 import cv2 as cv
 
 from src.utils import get_logger, save_debug_image, get_image_hash
-
+from src.exceptions import DigitsSplitterError
 
 logger = get_logger(__name__)
 
@@ -28,6 +28,8 @@ class SimpleSplitter(DigitsSplitter):
     # relative to cell height
     MIN_ARC_COEFF = 1.0
     WHITE = 255
+    # minimum number of digits in grid
+    MIN_DIGITS_IN_GRID = 17
 
     def __init__(self):
         super().__init__()
@@ -115,8 +117,14 @@ class SimpleSplitter(DigitsSplitter):
         )
 
         all_digits = self.split_into_digits(image)
+        not_none_digits = [d for d in all_digits if d is not None]
+
+        if len(not_none_digits) < self.MIN_DIGITS_IN_GRID:
+            raise DigitsSplitterError(
+                f"Found only {len(not_none_digits)} in grid, minimum is {self.MIN_DIGITS_IN_GRID}"
+            )
+
         if with_not_nones:
-            not_none_digits = [d for d in all_digits if d is not None]
             return all_digits, not_none_digits
         else:
             return all_digits

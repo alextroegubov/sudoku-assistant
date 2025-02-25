@@ -28,6 +28,10 @@ class OpenCvError(ImagePreprocessingError):
     """Raised when an OpenCV error occurs."""
 
 
+class DigitsSplitterError(ImagePreprocessingError):
+    """Raised on error while splitting grid into digits"""
+
+
 class SudokuError(SudokuAssistantError):
     """Base class for exception during sudoku solving"""
 
