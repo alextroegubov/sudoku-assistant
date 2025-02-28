@@ -4,6 +4,7 @@ import pytest
 from pathlib import Path
 
 from src.image_preprocess import digits_splitter, field_extractor
+from src.exceptions import ImagePreprocessingError
 
 # Path to the test cases folder
 TEST_CASES_DIR = Path(__file__).parent / "test_image_preprocess_cases"
@@ -14,6 +15,8 @@ image_files = [
     TEST_CASES_DIR / "sudoku_book_3.jpg",
     TEST_CASES_DIR / "sudoku_book_4.jpeg",
     TEST_CASES_DIR / "sudoku_book_5.jpeg",
+    TEST_CASES_DIR / "sudoku_book_5_rotated.jpg",
+    TEST_CASES_DIR / "sudoku_book_5_perspective.jpg",
     TEST_CASES_DIR / "sudoku_com_expert.png",
     TEST_CASES_DIR / "sudoku_com_extreme.png",
     TEST_CASES_DIR / "sudoku_com_master.png",
@@ -30,6 +33,10 @@ answers = [
     # sudoku_book_4.jpeg,
     [3, 4, 5, 9, 10, 12, 14, 16, 17, 27, 29, 33, 35, 37, 43, 45, 47, 51, 53, 63, 64, 66, 68, 70, 71, 75, 76, 77],
     # sudoku_book_5.jpeg
+    list(range(81)),
+    # sudoku_book_5_rotated.jpeg
+    list(range(81)),
+    # sudoku_book_5_perspective.jpeg
     list(range(81)),
     # sudoku_com_expert.png
     [1, 7, 8, 10, 13, 19, 24, 25, 28, 30, 34, 35, 36, 39, 40, 43, 45, 48, 53, 54, 56, 58, 61, 62, 63, 67, 71, 72, 76, 77],
@@ -62,3 +69,16 @@ def test_image_preprocess_file(filename, correct_not_nones_idx):
     misrec = sorted(list(set(not_nones_idx) - set(correct_not_nones_idx)))
 
     assert not_nones_idx == correct_not_nones_idx, f"Unrecognized: {unrec}; Misrecognized: {misrec}"
+
+
+invalid_images = list(TEST_CASES_DIR.glob('invalid_*.*'))
+
+
+@pytest.mark.parametrize("filename", invalid_images)
+def test_image_preprocess_invalid_files(filename):
+
+    extractor = field_extractor.FieldExtractor()
+    img = cv.imread(filename)
+
+    with pytest.raises(ImagePreprocessingError):
+        extractor(img)

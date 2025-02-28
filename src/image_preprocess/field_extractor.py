@@ -42,7 +42,7 @@ class FieldExtractor:
     @staticmethod
     def dist(pt1, pt2):
         """L2 distance"""
-        return np.sqrt(np.sum(pt1 - pt2) ** 2)
+        return np.sqrt(np.sum((pt1 - pt2) ** 2))
 
     @staticmethod
     def _calculate_angle(x1: int, y1: int, x2: int, y2: int) -> float:
@@ -189,23 +189,19 @@ class FieldExtractor:
     def reorder_cntr_corners(self, points: np.ndarray):
         """Reorder contour points as tl, tr, br, bl"""
         if points.shape != (4, 2):
-            raise ValueError("Points should have (4, 2) shape")
-        x_c, y_c = points.mean(axis=0)
+            raise ValueError("Points should have shape (4, 2)")
 
-        tl = tr = br = bl = 0
+        # Sum (x + y) for each point to differentiate TL (min) & BR (max)
+        sums = points.sum(axis=1)
+        tl = points[np.argmin(sums)]
+        br = points[np.argmax(sums)]
 
-        for p in points:
-            x, y = p
-            if x < x_c and y < y_c:
-                tl = p
-            elif x > x_c and y < y_c:
-                tr = p
-            elif x > x_c and y > y_c:
-                br = p
-            elif x < x_c and y > y_c:
-                bl = p
+        # Difference (x - y) for each point to differentiate TR & BL
+        diffs = np.diff(points, axis=1).flatten()
+        tr = points[np.argmin(diffs)]
+        bl = points[np.argmax(diffs)]
 
-        return tl, tr, br, bl
+        return np.array([tl, tr, br, bl])
 
     def image_postprocess(self):
         self.image = cv.morphologyEx(self.image, cv.MORPH_CLOSE, kernel=np.ones((3, 3)))
