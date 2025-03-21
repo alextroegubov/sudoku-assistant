@@ -8,7 +8,7 @@ from torchvision import transforms
 from torchvision.datasets import ImageFolder
 from torch.utils.data import DataLoader, ConcatDataset
 
-import timm
+from timm import create_model
 import torch
 import torch.nn as nn
 import torch.optim as optim
@@ -19,21 +19,20 @@ class ClassifierTrainer:
     num_classes: 9
 
     @staticmethod
-    def get_mean_and_std(folders: list[str], suffixes={".jpg", ".jpeg", ".png"}):
+    def calculate_mean_and_std(folders: list[str], suffixes={".jpg", ".jpeg", ".png"}):
         mean = 0
         std = 0
         total_files = 0
 
         for folder in folders:
-            files = Path(folder).rglob("*")
+            files = [file for file in Path(folder).rglob("*") if file.suffix in suffixes]
 
             for file in files:
-                if file.suffix in suffixes:
-                    img = cv.imread(file, cv.IMREAD_GRAYSCALE)
+                img = cv.imread(file, cv.IMREAD_GRAYSCALE)
 
-                    mean += img.mean()
-                    std += img.std()
-                    total_files += 1
+                mean += img.mean()
+                std += img.std()
+                total_files += 1
 
         mean /= total_files
         std /= total_files
@@ -69,7 +68,7 @@ class ClassifierTrainer:
                 )
             ]
         )
-        common_transforms = transforms.Compose(
+        val_transforms = transforms.Compose(
             [
                 transforms.ToTensor(),
                 transforms.Grayscale(),
@@ -77,10 +76,9 @@ class ClassifierTrainer:
                 transforms.Normalize((self.mean), (self.std)),
             ]
         )
-
         train_transforms = transforms.Compose(
             [
-                common_transforms,
+                val_transforms,
                 aug_transforms,
             ]
         )
@@ -91,7 +89,7 @@ class ClassifierTrainer:
             )
         else:
             dataset = ConcatDataset(
-                [ImageFolder(root=f, transform=common_transforms) for f in self.test_folders]
+                [ImageFolder(root=f, transform=val_transforms) for f in self.test_folders]
             )
 
         loader = DataLoader(dataset, batch_size=self.batch_size, shuffle=train)
@@ -143,13 +141,15 @@ class ClassifierTrainer:
         train_loader = self.get_dataset_loader(train=True)
         test_loader = self.get_dataset_loader(train=False)
 
-        model = timm.create_model(
+        model = create_model(
             self.model_name, pretrained=True, num_classes=self.num_classes, in_chans=1
         )
 
         loss_fn = nn.CrossEntropyLoss()
         optimizer = optim.AdamW(model.parameters(), lr=self.params["lr"])
-        scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer=optimizer, factor=self.params["factor"], patience=self.params["patience"])
+        scheduler = optim.lr_scheduler.ReduceLROnPlateau(
+            optimizer=optimizer, factor=self.params["factor"], patience=self.params["patience"]
+        )
 
         for epoch in range(self.epochs):
             train_loss, train_acc = self.train_epoch(model, train_loader, loss_fn, optimizer)
