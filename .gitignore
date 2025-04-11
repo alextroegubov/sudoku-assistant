@@ -9,6 +9,12 @@ __pycache__/
 # Log files
 logs/*
 
+# Comet
+.cometml-runs/*
+
+# Data
+data_digits/*
+
 # Distribution / packaging
 .Python
 build/

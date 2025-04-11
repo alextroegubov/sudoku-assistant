@@ -1,0 +1,17 @@
+digit_size: 50
+
+data:
+  train_folders:
+    - "./data_digits/hand/train"
+    - "./data_digits/print/train"
+
+  test_folders:
+    - "./data_digits/hand/test"
+    - "./data_digits/print/test"
+
+  augmentations:
+    degrees: 10
+    translate: 0.15
+    scale: 0.1
+
+sched:
