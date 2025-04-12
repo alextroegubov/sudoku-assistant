@@ -6,15 +6,21 @@ from torchvision import transforms
 import timm
 import numpy as np
 
+from src.classifier.model import LightningClassifier
+
+
 class DigitsClassifier:
 
-    NORM_MEAN = 0.082
+    NORM_MEAN = 0.083
     NORM_STD = 0.257
 
-    def __init__(self, model_name: str, weights_file: str, device: str):
+    def __init__(self, weights_file: str, device: str):
         self.device = torch.device(device)
-        self.model: nn.Module = timm.create_model(model_name, num_classes=9, in_chans=1)
-        self.model.load_state_dict(torch.load(weights_file, weights_only=True))
+        # self.model: nn.Module = timm.create_model(model_name, num_classes=9, in_chans=1)
+        # self.model.load_state_dict(torch.load(weights_file, weights_only=True))
+
+        self.model = LightningClassifier.load_from_checkpoint(weights_file)
+
         self.model.eval()
         self.model.to(self.device)
 
@@ -27,12 +33,14 @@ class DigitsClassifier:
 
     def preprocess(self, images: list[np.ndarray]):
         # convert to tensor and add batch dim
-        inference_transform = transforms.Compose([
-            transforms.ToTensor(),
-            transforms.Grayscale(),
-            transforms.Resize((50, 50)),
-            transforms.Normalize(mean=(self.NORM_MEAN), std=(self.NORM_STD)),
-        ])
+        inference_transform = transforms.Compose(
+            [
+                transforms.ToTensor(),
+                transforms.Grayscale(),
+                transforms.Resize((50, 50)),
+                transforms.Normalize(mean=(self.NORM_MEAN), std=(self.NORM_STD)),
+            ]
+        )
         tensors = [inference_transform(img).unsqueeze(0) for img in images]
         images_batch = torch.concat(tensors, dim=0).to(self.device)
 

@@ -14,8 +14,7 @@ def test_classifier(filename):
     image = cv.imread(filename, cv.IMREAD_GRAYSCALE)
 
     model = digits_classifier.DigitsClassifier(
-        model_name="mobilenetv2_100.ra_in1k",
-        weights_file="model/best_model.pt",
+        weights_file="",
         device="cpu",
     )
 
@@ -25,5 +24,5 @@ def test_classifier(filename):
     label = labels[0] + 1
     true_label = int(str(filename.stem)[-3])
 
-    assert conf > 0.75, f"Low confidence: {conf}"
+    assert conf > 0.75, f"Low confidence ({filename.name}): {conf}"
     assert true_label == label, f"Wrong prediction, {label}"
