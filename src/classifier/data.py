@@ -37,7 +37,7 @@ def calculate_mean_and_std(folders: list[str], suffixes={".jpg", ".jpeg", ".png"
         mean = mean / 255
         std = std / 255
 
-    return (mean,), (std,)
+    return mean, std
 
 
 def get_train_transform(
