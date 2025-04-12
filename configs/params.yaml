@@ -1,17 +1,28 @@
-digit_size: 50
+num_classes: 9
+model_name: "mobilenetv3_large_100.ra_in1k"
 
 data:
-  train_folders:
-    - "./data_digits/hand/train"
-    - "./data_digits/print/train"
+  train_path: "data_digits/merged/train"
+  test_path: "data_digits/merged/test"
 
-  test_folders:
-    - "./data_digits/hand/test"
-    - "./data_digits/print/test"
+  in_size: 50
 
   augmentations:
     degrees: 10
-    translate: 0.15
+    translate: 0.1
     scale: 0.1
 
-sched:
+train:
+  batch_size: 64
+  split_seed: 42
+  max_epochs: 50
+
+  optim:
+    lr: !!float 1e-3
+    weight_decay: 0.01
+    t_initial: 30
+    warmup_lr_init: !!float 1e-7
+    warmup_t: 10
+    lr_min: !!float 1e-7
+    cycle_decay: 0.1
+    cycle_limit: 1
