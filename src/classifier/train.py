@@ -1,16 +1,14 @@
 from pathlib import Path
 import shutil
-
 import yaml
 
-from data import (
+from src.classifier.data import (
     calculate_mean_and_std,
     get_train_transform,
     get_val_transform,
     DigitsDataModule,
 )
-
-from model import LightningClassifier
+from src.classifier.model import LightningClassifier
 
 import lightning as L
 from lightning.pytorch.loggers import CometLogger
@@ -61,7 +59,7 @@ def merge_roots(dst: Path, roots: list[str], splits: list[str], classes: list[st
                         shutil.copy2(file, target_file)
 
 
-if __name__ == "__main__":
+def train(config_file: Path):
 
     # show_dataset_info(
     #     roots=[
@@ -82,7 +80,7 @@ if __name__ == "__main__":
     #     classes=["1", "2", "3", "4", "5", "6", "7", "8", "9"],
     # )
 
-    with open("/home/user/Documents/data/sudoku-assistant/configs/params.yaml", "r") as file:
+    with open(config_file, "r") as file:
         config = yaml.safe_load(file)
 
     mean, std = calculate_mean_and_std([config["data"]["train_path"]])
@@ -105,7 +103,7 @@ if __name__ == "__main__":
         train_path=Path(config["data"]["train_path"]),
         test_path=Path(config["data"]["test_path"]),
         batch_size=config["train"]["batch_size"],
-        split_seed=42,
+        split_seed=config["train"]["split_seed"],
     )
 
     model_name = config["model_name"]
@@ -137,11 +135,10 @@ if __name__ == "__main__":
         # fast_dev_run=True,
         num_sanity_val_steps=2,
         # profiler="simple",
-        max_epochs=50,
+        max_epochs=config["train"]["max_epochs"],
         accelerator="gpu",
         enable_progress_bar=True,
         logger=comet_logger,
     )
     trainer.fit(model=model, datamodule=datamodule)
-
     trainer.test(model, datamodule=datamodule)

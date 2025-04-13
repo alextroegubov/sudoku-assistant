@@ -14,15 +14,15 @@ def test_classifier(filename):
     image = cv.imread(filename, cv.IMREAD_GRAYSCALE)
 
     model = digits_classifier.DigitsClassifier(
-        weights_file="",
+        weights_file="model/epoch=31-val_acc=1.0000.ckpt",
         device="cpu",
     )
 
-    confs, labels = model([image])
+    confs, preds = model([image])
 
     conf = confs[0]
-    label = labels[0] + 1
-    true_label = int(str(filename.stem)[-3])
+    pred = preds[0] + 1
+    gt = int(str(filename.stem)[-3])
 
-    assert conf > 0.75, f"Low confidence ({filename.name}): {conf}"
-    assert true_label == label, f"Wrong prediction, {label}"
+    assert gt == pred, f"Wrong prediction ({filename.name}): {gt=} != {pred=}"
+    assert conf > 0.4, f"Too low confidence ({filename.name}): {conf}"

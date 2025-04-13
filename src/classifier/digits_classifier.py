@@ -1,9 +1,6 @@
 import torch
 from torch import nn
-import torchvision
 from torchvision import transforms
-
-import timm
 import numpy as np
 
 from src.classifier.model import LightningClassifier
@@ -16,16 +13,11 @@ class DigitsClassifier:
 
     def __init__(self, weights_file: str, device: str):
         self.device = torch.device(device)
-        # self.model: nn.Module = timm.create_model(model_name, num_classes=9, in_chans=1)
-        # self.model.load_state_dict(torch.load(weights_file, weights_only=True))
-
         self.model = LightningClassifier.load_from_checkpoint(weights_file)
-
         self.model.eval()
         self.model.to(self.device)
 
     def __call__(self, images: list[np.ndarray]):
-        """"""
         images_batch = self.preprocess(images)
         conf, labels = self.apply_model(images_batch)
 
@@ -37,7 +29,7 @@ class DigitsClassifier:
             [
                 transforms.ToTensor(),
                 transforms.Grayscale(),
-                transforms.Resize((50, 50)),
+                transforms.Resize((self.model.input_size, self.model.input_size)),
                 transforms.Normalize(mean=(self.NORM_MEAN), std=(self.NORM_STD)),
             ]
         )

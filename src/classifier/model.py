@@ -21,11 +21,12 @@ class LightningClassifier(L.LightningModule):
 
         self.model_name = model_name
         self.num_classes = num_classes
+        self.input_size = input_size
 
         self.model = create_model(
             self.model_name, pretrained=True, num_classes=self.num_classes, in_chans=1
         )
-        self.example_input_array = torch.randn((32, 1, input_size, input_size))
+        self.example_input_array = torch.randn((32, 1, self.input_size, self.input_size))
 
         # metrics
         self.val_acc = Accuracy(task="multiclass", num_classes=num_classes)

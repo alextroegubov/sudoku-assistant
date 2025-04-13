@@ -1,11 +1,11 @@
 num_classes: 9
-model_name: "mobilenetv3_large_100.ra_in1k"
+model_name: "mobilenetv2_100.ra_in1k"
 
 data:
   train_path: "data_digits/merged/train"
   test_path: "data_digits/merged/test"
 
-  in_size: 50
+  in_size: 64
 
   augmentations:
     degrees: 10
@@ -13,16 +13,16 @@ data:
     scale: 0.1
 
 train:
-  batch_size: 64
+  batch_size: 128
   split_seed: 42
-  max_epochs: 50
+  max_epochs: 100
 
   optim:
     lr: !!float 1e-3
     weight_decay: 0.01
-    t_initial: 30
+    t_initial: 40
     warmup_lr_init: !!float 1e-7
-    warmup_t: 10
+    warmup_t: 5
     lr_min: !!float 1e-7
     cycle_decay: 0.1
     cycle_limit: 1
